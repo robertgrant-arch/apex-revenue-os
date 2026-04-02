@@ -1,5 +1,5 @@
 "use client";
-
+import { useState, useEffect } from "react";
 import {
   AreaChart,
   Area,
@@ -41,6 +41,16 @@ import {
 } from "@/lib/data";
 
 export default function DashboardPage() {
+  const [liveLog, setLiveLog] = useState(auditLog.slice(0, 6));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const re = auditLog[Math.floor(Math.random() * auditLog.length)];
+      setLiveLog((p) => [{ ...re, id: `live-${Date.now()}`, time: "1s ago" }, ...p].slice(0, 10));
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <>
       <TopBar title="Revenue Dashboard" subtitle="April 2, 2025 · All systems live" />
@@ -78,365 +88,191 @@ export default function DashboardPage() {
             sub="+2 pts this week"
             trend="up"
             icon={Activity}
-            color="#ec4899"
+            color="#ef4444"
           />
         </div>
 
         {/* ── KPI Row 2 ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
-            label="Avg CPL"
-            value="$38"
-            sub="-$6 vs last month"
+            label="Active Agents"
+            value="5 / 5"
+            sub="All online"
             trend="up"
-            icon={Target}
-            color="#10b981"
-          />
-          <MetricCard
-            label="Avg CPA"
-            value="$412"
-            sub="-$89 vs last month"
-            trend="up"
-            icon={Target}
-            color="#3b82f6"
-          />
-          <MetricCard
-            label="ROAS"
-            value="6.2x"
-            sub="+0.8x vs last month"
-            trend="up"
-            icon={BarChart2}
+            icon={Zap}
             color="#8b5cf6"
           />
           <MetricCard
-            label="Show Rate"
-            value="78%"
-            sub="+4% vs last month"
+            label="Lead Score Avg"
+            value="73"
+            sub="+4 vs last week"
+            trend="up"
+            icon={Target}
+            color="#06b6d4"
+          />
+          <MetricCard
+            label="Compliance"
+            value="100%"
+            sub="All calls approved"
             trend="up"
             icon={CheckCircle2}
-            color="#06b6d4"
+            color="#10b981"
+          />
+          <MetricCard
+            label="Campaigns"
+            value="12"
+            sub="3 launched today"
+            trend="up"
+            icon={BarChart2}
+            color="#f97316"
           />
         </div>
 
         {/* ── Charts Row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Revenue Area Chart */}
-          <Card className="lg:col-span-2 p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Revenue Trend */}
+          <Card>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                Revenue Trend — Last 7 Months
-              </h3>
-              <div className="flex gap-4 text-xs text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                  Pipeline ($k)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
-                  Closed ($k)
-                </span>
-              </div>
+              <h3 className="text-sm font-semibold text-zinc-100">Revenue Trend</h3>
+              <Badge variant="green">+31%</Badge>
             </div>
-            <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={revenueData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={revenueData}>
                 <defs>
-                  <linearGradient id="gPipeline" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gClosed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#8b5cf6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${v}k`}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="month" tick={{ fill: "#71717a", fontSize: 12 }} />
+                <YAxis tick={{ fill: "#71717a", fontSize: 12 }} />
                 <Tooltip content={<ChartTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="pipeline"
-                  name="Pipeline ($k)"
-                  stroke="#10b981"
-                  fill="url(#gPipeline)"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4, fill: "#10b981" }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="closed"
-                  name="Closed ($k)"
-                  stroke="#8b5cf6"
-                  fill="url(#gClosed)"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4, fill: "#8b5cf6" }}
-                />
+                <Area type="monotone" dataKey="revenue" stroke="#6366f1" fill="url(#revGrad)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </Card>
 
-          {/* Lead Score Bar Chart */}
-          <Card className="p-4">
-            <h3 className="text-sm font-semibold text-white mb-4">
-              Lead Score Distribution
-            </h3>
-            <ResponsiveContainer width="100%" height={185}>
-              <BarChart
-                data={leadScoreData}
-                barSize={26}
-                margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
-              >
-                <XAxis
-                  dataKey="score"
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+          {/* Appointments */}
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-zinc-100">Appointments by Week</h3>
+              <Badge variant="blue">89 total</Badge>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={appointmentData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="week" tick={{ fill: "#71717a", fontSize: 12 }} />
+                <YAxis tick={{ fill: "#71717a", fontSize: 12 }} />
                 <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" name="Leads" radius={[4, 4, 0, 0]}>
-                  {leadScoreData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                <Bar dataKey="booked" radius={[4, 4, 0, 0]}>
+                  {appointmentData.map((_, i) => (
+                    <Cell key={i} fill={i === appointmentData.length - 1 ? "#6366f1" : "#3f3f46"} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-2 text-xs text-slate-500 text-center">
-              1,444 total scored leads
+          </Card>
+        </div>
+
+        {/* ── Lead Score + Agent Grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Lead Score Distribution */}
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-zinc-100">Lead Score Distribution</h3>
+              <Badge variant="cyan">Avg 73</Badge>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={leadScoreData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="range" tick={{ fill: "#71717a", fontSize: 12 }} />
+                <YAxis tick={{ fill: "#71717a", fontSize: 12 }} />
+                <Tooltip content={<ChartTooltip />} />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#10b981" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Agent Status Grid */}
+          <Card>
+            <h3 className="text-sm font-semibold text-zinc-100 mb-4">Agent Status</h3>
+            <div className="space-y-3">
+              {AGENTS.map((a) => (
+                <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
+                  <div className="flex items-center gap-3">
+                    <StatusDot status={a.status} />
+                    <div>
+                      <p className="text-sm font-medium text-zinc-100">{a.name}</p>
+                      <p className="text-xs text-zinc-500">{a.role}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-zinc-100">{a.metric}</p>
+                    <p className="text-xs text-zinc-500">{a.metricLabel}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
         </div>
 
-        {/* ── Appointments Line Chart ── */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">
-              Appointments This Week — Booked vs Showed vs Closed
-            </h3>
-            <div className="flex gap-4 text-xs text-slate-400">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />Booked</span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Showed</span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />Closed</span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <LineChart data={appointmentData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Line type="monotone" dataKey="booked" name="Booked" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6" }} />
-              <Line type="monotone" dataKey="showed" name="Showed" stroke="#10b981" strokeWidth={2} dot={{ r: 3, fill: "#10b981" }} />
-              <Line type="monotone" dataKey="closed" name="Closed" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: "#f59e0b" }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* ── Agent Status Panel ── */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">Agent Status Panel</h3>
-            <div className="flex items-center gap-2">
-              <Badge color="emerald">6 / 7 Active</Badge>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                <Activity size={11} className="text-emerald-400 animate-pulse" />
-                Live
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
-            {AGENTS.map((a) => (
-              <div
-                key={a.id}
-                className="bg-slate-900 rounded-lg p-3 text-center hover:bg-slate-800 transition-colors"
-              >
-                <div
-                  className="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center"
-                  style={{ background: a.color + "20" }}
-                >
-                  <a.icon size={14} style={{ color: a.color }} />
-                </div>
-                <div className="text-[10px] font-bold text-white mb-1 truncate">{a.name}</div>
-                <div className="flex justify-center mb-1">
-                  <StatusDot status={a.status} />
-                </div>
-                <div className="text-[10px] text-slate-500">{a.confidence}%</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
         {/* ── Campaigns Table ── */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">Active Campaigns</h3>
-            <a
-              href="/campaigns"
-              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              View all →
-            </a>
-          </div>
+        <Card>
+          <h3 className="text-sm font-semibold text-zinc-100 mb-4">Active Campaigns</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="text-slate-500 border-b border-slate-800">
-                  {[
-                    "Campaign",
-                    "Vertical",
-                    "Status",
-                    "Spend",
-                    "Pipeline",
-                    "ROAS",
-                    "Leads",
-                    "Appts",
-                    "CPL",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left py-2 pr-4 font-medium whitespace-nowrap"
-                    >
-                      {h}
-                    </th>
-                  ))}
+                <tr className="text-zinc-500 border-b border-zinc-800">
+                  <th className="text-left py-2 font-medium">Campaign</th>
+                  <th className="text-left py-2 font-medium">Status</th>
+                  <th className="text-right py-2 font-medium">Spend</th>
+                  <th className="text-right py-2 font-medium">ROAS</th>
+                  <th className="text-right py-2 font-medium">Leads</th>
                 </tr>
               </thead>
               <tbody>
-                {campaigns
-                  .filter((c) => c.status !== "draft")
-                  .map((c) => (
-                    <tr
-                      key={c.id}
-                      className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors"
-                    >
-                      <td className="py-2.5 pr-4 text-white font-medium whitespace-nowrap max-w-[160px] truncate">
-                        {c.name}
-                      </td>
-                      <td className="pr-4">
-                        <Badge
-                          color={
-                            c.vertical === "Medicare"
-                              ? "blue"
-                              : c.vertical === "Legal"
-                              ? "purple"
-                              : c.vertical === "Home Services"
-                              ? "slate"
-                              : "amber"
-                          }
-                        >
-                          {c.vertical}
-                        </Badge>
-                      </td>
-                      <td className="pr-4">
-                        <span className="flex items-center gap-1.5 whitespace-nowrap">
-                          <StatusDot status={c.status} />
-                          <span className="text-slate-400 capitalize">{c.status}</span>
-                        </span>
-                      </td>
-                      <td className="pr-4 text-slate-300">
-                        ${c.spend.toLocaleString()}
-                      </td>
-                      <td className="pr-4 text-emerald-400 font-medium">
-                        ${c.pipeline.toLocaleString()}
-                      </td>
-                      <td className="pr-4 text-white font-semibold">{c.roas}x</td>
-                      <td className="pr-4 text-slate-300">{c.leads}</td>
-                      <td className="pr-4 text-slate-300">{c.appts}</td>
-                      <td className="pr-4 text-slate-300">${c.cpl}</td>
-                    </tr>
-                  ))}
+                {campaigns.map((c) => (
+                  <tr key={c.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-3 text-zinc-100">{c.name}</td>
+                    <td className="py-3">
+                      <Badge variant={c.status === "active" ? "green" : c.status === "paused" ? "yellow" : "zinc"}>{c.status}</Badge>
+                    </td>
+                    <td className="py-3 text-right text-zinc-300">{c.spend}</td>
+                    <td className="py-3 text-right text-zinc-300">{c.roas}</td>
+                    <td className="py-3 text-right text-zinc-300">{c.leads}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </Card>
 
-        {/* ── Decision Audit Log ── */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">
-              Decision Audit Log
-            </h3>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Zap size={11} className="text-emerald-400" />
-              <Activity size={11} className="text-emerald-400 animate-pulse" />
-              Live — auto-updating
+        {/* ── Live Audit Log ── */}
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-zinc-100">Live Audit Feed</h3>
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-xs text-zinc-500">Live</span>
             </div>
           </div>
           <div className="space-y-2">
-            {auditLog.map((l) => {
-              const ag = AGENTS.find((a) => a.name === l.agent);
-              return (
-                <div
-                  key={l.id}
-                  className="flex items-start gap-3 p-3 bg-slate-900/50 rounded-lg hover:bg-slate-900 transition-colors group"
-                >
-                  {ag && (
-                    <div
-                      className="w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5"
-                      style={{ background: ag.color + "20" }}
-                    >
-                      <ag.icon size={12} style={{ color: ag.color }} />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                      <span className="text-xs font-bold text-white">
-                        {l.agent}
-                      </span>
-                      <span className="text-xs text-slate-500">{l.time}</span>
-                      <Badge color="emerald">{l.confidence}% conf.</Badge>
-                      <Badge
-                        color={
-                          l.category === "suppression"
-                            ? "amber"
-                            : l.category === "creative"
-                            ? "pink"
-                            : l.category === "intelligence"
-                            ? "blue"
-                            : l.category === "budget"
-                            ? "red"
-                            : "slate"
-                        }
-                      >
-                        {l.category}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-slate-300">{l.decision}</div>
-                    <div className="text-xs text-emerald-400/80 mt-0.5">
-                      Impact: {l.impact}
-                    </div>
+            {liveLog.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between p-2 rounded-md bg-zinc-800/30 border border-zinc-700/30">
+                <div className="flex items-center gap-3">
+                  <StatusDot status={entry.level === "success" ? "online" : entry.level === "warning" ? "warning" : "info"} />
+                  <div>
+                    <p className="text-sm text-zinc-200">{entry.message}</p>
+                    <p className="text-xs text-zinc-500">{entry.agent}</p>
                   </div>
-                  <button className="text-slate-600 hover:text-slate-400 transition-colors shrink-0 mt-0.5 opacity-0 group-hover:opacity-100">
-                    <Info size={12} />
-                  </button>
                 </div>
-              );
-            })}
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
-            <span className="text-xs text-slate-500">
-              Showing last 8 decisions
-            </span>
-            <button className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
-              View full audit log →
-            </button>
+                <span className="text-xs text-zinc-600 whitespace-nowrap">{entry.time}</span>
+              </div>
+            ))}
           </div>
         </Card>
 
