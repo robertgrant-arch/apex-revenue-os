@@ -1,190 +1,129 @@
 "use client";
-import { useState } from "react";
-import { Search, Plus, Filter, BarChart2, DollarSign, TrendingUp } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+import { useState, useEffect, useCallback } from "react";
 import Card from "@/components/ui/Card";
-import Modal from "@/components/ui/Modal";
-import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { cn } from "@/lib/utils";
-import { toast } from "@/components/ui/Toast";
+import * as store from "@/lib/store";
 
-const CAMPAIGNS = [
-  { id: 1, name: "Medicare AEP Q1 2025", vertical: "Medicare", status: "active", spend: 24200, pipeline: 312000, leads: 842, cpl: 28.74, roas: 12.9, agent: "ORACLE", start: "Jan 1", end: "Mar 31" },
-  { id: 2, name: "Auto Cross-sell Spring", vertical: "Auto", status: "active", spend: 12800, pipeline: 98400, leads: 520, cpl: 24.62, roas: 7.7, agent: "SIGNAL", start: "Feb 1", end: "Apr 30" },
-  { id: 3, name: "Life Insurance Push", vertical: "Life", status: "active", spend: 8400, pipeline: 67200, leads: 310, cpl: 27.10, roas: 8.0, agent: "REACH", start: "Feb 15", end: "May 15" },
-  { id: 4, name: "Home Bundle Q2", vertical: "Home", status: "draft", spend: 0, pipeline: 0, leads: 0, cpl: 0, roas: 0, agent: "ARCHITECT", start: "Apr 1", end: "Jun 30" },
-  { id: 5, name: "Medicare Supplement Retargeting", vertical: "Medicare", status: "paused", spend: 6200, pipeline: 48000, leads: 188, cpl: 32.98, roas: 7.7, agent: "ORACLE", start: "Jan 15", end: "Mar 15" },
-  { id: 6, name: "Term Life Winback", vertical: "Life", status: "completed", spend: 4100, pipeline: 38800, leads: 142, cpl: 28.87, roas: 9.5, agent: "CONVERT", start: "Nov 1", end: "Jan 31" },
-];
+interface Campaign {
+  id: string; name: string; vertical: string; budget: number; spent: number;
+  goal: string; status: string; startDate: string; endDate: string;
+  leads: number; revenue: number; createdAt: string;
+}
 
-const spendPipelineData = [
-  { name: "Medicare AEP", spend: 24200, pipeline: 312000 },
-  { name: "Auto Cross-sell", spend: 12800, pipeline: 98400 },
-  { name: "Life Push", spend: 8400, pipeline: 67200 },
-  { name: "Med Supp Retarg", spend: 6200, pipeline: 48000 },
-  { name: "Term Life Winback", spend: 4100, pipeline: 38800 },
-];
-
-const statusColors: Record<string, string> = {
-  active: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  paused: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  draft: "bg-slate-700 text-slate-400 border-slate-600",
-  completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-};
-
-const verticals = ["All", "Medicare", "Auto", "Life", "Home"];
-const statuses = ["All", "active", "paused", "draft", "completed"];
+const KEY = "campaigns";
+const VERTICALS = ["Medicare", "Auto", "Life", "Home"];
+const STATUSES = ["active", "paused", "draft", "completed"];
+const GOALS = ["leads", "revenue", "awareness"];
+const STATUS_COLORS: Record<string, string> = { active: "bg-emerald-500/20 text-emerald-400", paused: "bg-amber-500/20 text-amber-400", draft: "bg-slate-500/20 text-slate-400", completed: "bg-blue-500/20 text-blue-400" };
 
 export default function CampaignsPage() {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [search, setSearch] = useState("");
-  const [vertical, setVertical] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", vertical: "Medicare", budget: "", goal: "leads" });
+  const [sFilter, setSFilter] = useState("All");
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: "", vertical: "Medicare", budget: "", goal: "leads", startDate: "", endDate: "" });
 
-  const filtered = CAMPAIGNS.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
-    const matchVertical = vertical === "All" || c.vertical === vertical;
-    const matchStatus = status === "All" || c.status === status;
-    return matchSearch && matchVertical && matchStatus;
+  const load = useCallback(() => setCampaigns(store.getAll<Campaign>(KEY)), []);
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = campaigns.filter(c => {
+    const q = search.toLowerCase();
+    return (!q || c.name.toLowerCase().includes(q)) && (sFilter === "All" || c.status === sFilter);
   });
 
-  const handleCreate = () => {
-    if (!form.name || !form.budget) { toast.error("Please fill in all required fields"); return; }
-    setModalOpen(false);
-    toast.success(`Campaign "${form.name}" created`);
-    setForm({ name: "", vertical: "Medicare", budget: "", goal: "leads" });
-  };
+  function handleCreate() {
+    if (!form.name || !form.budget) return;
+    store.create<Campaign>(KEY, { id: `camp-${Date.now()}`, name: form.name, vertical: form.vertical, budget: Number(form.budget), spent: 0, goal: form.goal, status: "draft", startDate: form.startDate, endDate: form.endDate, leads: 0, revenue: 0, createdAt: new Date().toISOString() });
+    setForm({ name: "", vertical: "Medicare", budget: "", goal: "leads", startDate: "", endDate: "" });
+    setShowModal(false); load();
+  }
+
+  function handleStatus(id: string, status: string) { store.update<Campaign>(KEY, id, { status }); load(); }
+  function handleDelete(id: string) { store.remove(KEY, id); load(); }
+
+  const totalBudget = campaigns.reduce((s, c) => s + c.budget, 0);
+  const totalSpent = campaigns.reduce((s, c) => s + c.spent, 0);
+  const activeCampaigns = campaigns.filter(c => c.status === "active").length;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Campaigns</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{CAMPAIGNS.filter(c => c.status === "active").length} active campaigns</p>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div><h1 className="text-2xl font-bold">Campaigns</h1><p className="text-slate-400 text-sm mt-1">Manage your marketing campaigns</p></div>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold">Create Campaign</button>
         </div>
-        <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-medium transition-colors">
-          <Plus className="w-4 h-4" /> New Campaign
-        </button>
-      </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 flex items-center gap-3">
-          <div className="p-2 bg-emerald-400/10 rounded-lg"><DollarSign className="w-5 h-5 text-emerald-400" /></div>
-          <div><p className="text-xs text-slate-400">Total Spend</p><p className="text-lg font-bold text-white">$55,700</p></div>
-        </Card>
-        <Card className="p-4 flex items-center gap-3">
-          <div className="p-2 bg-violet-400/10 rounded-lg"><TrendingUp className="w-5 h-5 text-violet-400" /></div>
-          <div><p className="text-xs text-slate-400">Total Pipeline</p><p className="text-lg font-bold text-white">$564,400</p></div>
-        </Card>
-        <Card className="p-4 flex items-center gap-3">
-          <div className="p-2 bg-amber-400/10 rounded-lg"><BarChart2 className="w-5 h-5 text-amber-400" /></div>
-          <div><p className="text-xs text-slate-400">Blended ROAS</p><p className="text-lg font-bold text-white">10.1x</p></div>
-        </Card>
-      </div>
-
-      <Card className="p-5">
-        <h3 className="text-sm font-semibold text-white mb-4">Spend vs Pipeline by Campaign</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={spendPipelineData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-            <Tooltip content={<ChartTooltip />} />
-            <Bar dataKey="spend" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Spend" />
-            <Bar dataKey="pipeline" fill="#10b981" radius={[4, 4, 0, 0]} name="Pipeline" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search campaigns..." className="w-full pl-9 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Filter className="w-4 h-4 text-slate-500" />
-          {verticals.map(v => (
-            <button key={v} onClick={() => setVertical(v)} className={cn("px-2.5 py-1.5 text-xs rounded-md font-medium transition-all", vertical === v ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:text-white")}>
-              {v}
-            </button>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[{ l: "Total Campaigns", v: campaigns.length }, { l: "Active", v: activeCampaigns }, { l: "Total Budget", v: `$${totalBudget.toLocaleString()}` }, { l: "Total Spent", v: `$${totalSpent.toLocaleString()}` }].map(s => (
+            <Card key={s.l} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+              <div className="text-xs text-slate-500 uppercase mb-2">{s.l}</div>
+              <div className="text-2xl font-bold text-emerald-400">{s.v}</div>
+            </Card>
           ))}
         </div>
-        <div className="flex items-center gap-1.5">
-          {statuses.map(s => (
-            <button key={s} onClick={() => setStatus(s)} className={cn("px-2.5 py-1.5 text-xs rounded-md font-medium capitalize transition-all", status === s ? "bg-violet-500/20 text-violet-400 border border-violet-500/30" : "bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:text-white")}>
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-700/50">
-                {["Campaign", "Vertical", "Status", "Spend", "Pipeline", "Leads", "CPL", "ROAS", "Agent", "Dates"].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/30">
-              {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-slate-700/20 transition-colors">
-                  <td className="px-4 py-3 text-sm text-white font-medium">{c.name}</td>
-                  <td className="px-4 py-3 text-sm text-slate-400">{c.vertical}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium capitalize border", statusColors[c.status])}>{c.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-white">{c.spend > 0 ? `$${c.spend.toLocaleString()}` : "—"}</td>
-                  <td className="px-4 py-3 text-sm text-emerald-400">{c.pipeline > 0 ? `$${c.pipeline.toLocaleString()}` : "—"}</td>
-                  <td className="px-4 py-3 text-sm text-white">{c.leads > 0 ? c.leads.toLocaleString() : "—"}</td>
-                  <td className="px-4 py-3 text-sm text-white">{c.cpl > 0 ? `$${c.cpl}` : "—"}</td>
-                  <td className="px-4 py-3 text-sm text-amber-400">{c.roas > 0 ? `${c.roas}x` : "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">{c.agent}</span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{c.start} → {c.end}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input type="text" placeholder="Search campaigns..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-slate-500" />
+          <select value={sFilter} onChange={e => setSFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm">
+            <option>All</option>{STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
         </div>
-      </Card>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create New Campaign" size="md">
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-slate-400 mb-1.5 block">Campaign Name *</label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Medicare AEP Q2 2025" className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50" />
+        {filtered.length === 0 ? (
+          <div className="text-center py-16"><div className="text-4xl mb-4">&#x1f4e2;</div><h3 className="text-lg font-semibold text-white mb-2">No campaigns yet</h3><p className="text-slate-400 text-sm">Create your first campaign to get started.</p></div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map(c => {
+              const pct = c.budget > 0 ? Math.min((c.spent / c.budget) * 100, 100) : 0;
+              return (
+                <div key={c.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 flex flex-col gap-3">
+                  <div className="flex items-start justify-between">
+                    <div><p className="text-sm font-semibold text-white">{c.name}</p><p className="text-xs text-slate-500">{c.vertical} &middot; {c.goal}</p></div>
+                    <select value={c.status} onChange={e => handleStatus(c.id, e.target.value)} className="text-xs bg-slate-700 text-slate-300 rounded px-1 py-0.5">
+                      {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div><div className="flex justify-between text-xs mb-1"><span className="text-slate-400">Budget</span><span className="text-white">{pct.toFixed(0)}%</span></div>
+                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden"><div className={cn("h-full rounded-full", pct > 90 ? "bg-red-500" : "bg-emerald-500")} style={{width: `${pct}%`}} /></div>
+                    <div className="flex justify-between text-xs mt-1"><span className="text-slate-500">${c.spent.toLocaleString()} spent</span><span className="text-slate-500">${c.budget.toLocaleString()} budget</span></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/50 text-xs">
+                    <div><span className="text-slate-500">Leads: </span><span className="text-white font-semibold">{c.leads}</span></div>
+                    <div><span className="text-slate-500">Revenue: </span><span className="text-emerald-400 font-semibold">${c.revenue.toLocaleString()}</span></div>
+                  </div>
+                  <button onClick={() => handleDelete(c.id)} className="text-xs text-red-400 hover:text-red-300 self-end">Delete</button>
+                </div>
+              );
+            })}
           </div>
-          <div>
-            <label className="text-xs text-slate-400 mb-1.5 block">Vertical *</label>
-            <select value={form.vertical} onChange={e => setForm(f => ({ ...f, vertical: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500/50">
-              {["Medicare", "Auto", "Life", "Home"].map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-400 mb-1.5 block">Budget (USD) *</label>
-            <input type="number" value={form.budget} onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} placeholder="10000" className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50" />
-          </div>
-          <div>
-            <label className="text-xs text-slate-400 mb-1.5 block">Primary Goal</label>
-            <div className="flex gap-2">
-              {["leads", "revenue", "awareness"].map(g => (
-                <button key={g} onClick={() => setForm(f => ({ ...f, goal: g }))} className={cn("flex-1 py-2 text-sm rounded-lg font-medium capitalize border transition-all", form.goal === g ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white")}>
-                  {g}
-                </button>
-              ))}
+        )}
+
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" onClick={() => setShowModal(false)} />
+            <div className="relative z-10 w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Create Campaign</h3>
+              <div className="space-y-3">
+                <input placeholder="Campaign name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <select value={form.vertical} onChange={e => setForm({...form, vertical: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm">
+                  {VERTICALS.map(v => <option key={v}>{v}</option>)}
+                </select>
+                <input type="number" placeholder="Budget ($)" value={form.budget} onChange={e => setForm({...form, budget: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <select value={form.goal} onChange={e => setForm({...form, goal: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm">
+                  {GOALS.map(g => <option key={g}>{g}</option>)}
+                </select>
+                <input type="date" value={form.startDate} onChange={e => setForm({...form, startDate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <input type="date" value={form.endDate} onChange={e => setForm({...form, endDate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 text-sm">Cancel</button>
+                <button onClick={handleCreate} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm">Create</button>
+              </div>
             </div>
           </div>
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setModalOpen(false)} className="flex-1 py-2 text-sm rounded-lg font-medium text-slate-400 border border-slate-700 hover:text-white transition-colors">Cancel</button>
-            <button onClick={handleCreate} className="flex-1 py-2 text-sm rounded-lg font-medium bg-emerald-500 hover:bg-emerald-400 text-white transition-colors">Create Campaign</button>
-          </div>
-        </div>
-      </Modal>
+        )}
+      </div>
     </div>
   );
 }

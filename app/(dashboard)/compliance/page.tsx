@@ -1,185 +1,120 @@
 "use client";
-import { useState } from "react";
-import { Shield, CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+
+import { useState, useEffect, useCallback } from "react";
 import Card from "@/components/ui/Card";
-import { ChartTooltip } from "@/components/ui/ChartTooltip";
 import { cn } from "@/lib/utils";
-import { toast } from "@/components/ui/Toast";
+import * as store from "@/lib/store";
 
-const SCORES = [
-  { vertical: "Medicare", score: 94, rules: 48, violations: 2, color: "#10b981" },
-  { vertical: "Auto", score: 98, rules: 32, violations: 0, color: "#8b5cf6" },
-  { vertical: "Life", score: 91, rules: 41, violations: 3, color: "#f59e0b" },
-  { vertical: "Home", score: 96, rules: 28, violations: 1, color: "#3b82f6" },
-];
+interface ComplianceIssue { id: string; rule: string; severity: string; description: string; resolved: boolean; }
+interface ComplianceCheck { id: string; targetType: string; targetName: string; status: string; issues: ComplianceIssue[]; runAt: string; resolvedCount: number; }
 
-const donutData = [
-  { name: "Medicare", value: 94, color: "#10b981" },
-  { name: "Auto", value: 98, color: "#8b5cf6" },
-  { name: "Life", value: 91, color: "#f59e0b" },
-  { name: "Home", value: 96, color: "#3b82f6" },
-];
-
-const AUDIT_LOG = [
-  { id: 1, item: "Medicare AEP Ad Copy — Claim softened: 'guaranteed' removed", vertical: "Medicare", severity: "medium", status: "pending", agent: "CREATOR", time: "14:18" },
-  { id: 2, item: "Life Insurance Email — Disclosure statement added", vertical: "Life", severity: "high", status: "pending", agent: "CREATOR", time: "13:55" },
-  { id: 3, item: "Auto Ad — CTA compliant with state regs (TX, CA, NY)", vertical: "Auto", severity: "low", status: "approved", agent: "REACH", time: "12:40" },
-  { id: 4, item: "Home Bundle Landing Page — Privacy notice updated", vertical: "Home", severity: "medium", status: "approved", agent: "ARCHITECT", time: "11:22" },
-  { id: 5, item: "Medicare Email — HIPAA safe harbor language verified", vertical: "Medicare", severity: "high", status: "approved", agent: "ORACLE", time: "10:14" },
-  { id: 6, item: "Life Ad — 'Best rate' claim flagged for substantiation", vertical: "Life", severity: "high", status: "pending", agent: "CREATOR", time: "09:33" },
-];
+const KEY = "compliance_checks";
+const SEVERITY_COLORS: Record<string, string> = { critical: "text-red-400", high: "text-orange-400", medium: "text-amber-400", low: "text-slate-400" };
 
 const RULES = [
-  { id: 1, rule: "No guaranteed outcome claims in Medicare ads", vertical: "Medicare", severity: "critical", active: true },
-  { id: 2, rule: "All insurance ads must include state licensing number", vertical: "All", severity: "high", active: true },
-  { id: 3, rule: "HIPAA safe harbor language required in all health comms", vertical: "Medicare", severity: "critical", active: true },
-  { id: 4, rule: "Substantiate all comparative price claims", vertical: "All", severity: "high", active: true },
-  { id: 5, rule: "Life insurance illustrations must meet NAIC standards", vertical: "Life", severity: "high", active: true },
-  { id: 6, rule: "Include privacy policy link in all email campaigns", vertical: "All", severity: "medium", active: true },
-  { id: 7, rule: "Auto ads: list all applicable fees", vertical: "Auto", severity: "medium", active: false },
+  { rule: "CMS Medicare Disclaimer", severity: "critical", description: "All Medicare ads must include CMS-required disclaimer text" },
+  { rule: "Fair Lending Notice", severity: "high", description: "Insurance ads must not discriminate based on protected classes" },
+  { rule: "Rate Accuracy", severity: "high", description: "Quoted rates must match current filed rates" },
+  { rule: "Privacy Policy Link", severity: "medium", description: "Landing pages must include accessible privacy policy" },
+  { rule: "Call Recording Disclosure", severity: "medium", description: "Outbound calls must disclose recording" },
+  { rule: "TCPA Consent", severity: "critical", description: "Prior express written consent required for marketing calls" },
+  { rule: "State License Display", severity: "low", description: "Agent license numbers should be visible on state-specific ads" },
 ];
 
-const severityColors: Record<string, string> = {
-  critical: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-  high: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  medium: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  low: "bg-slate-700 text-slate-400 border-slate-600",
-};
-
 export default function CompliancePage() {
-  const [auditLog, setAuditLog] = useState(AUDIT_LOG);
-  const [rules, setRules] = useState(RULES);
+  const [checks, setChecks] = useState<ComplianceCheck[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  const handleApprove = (id: number) => {
-    setAuditLog(log => log.map(l => l.id === id ? { ...l, status: "approved" } : l));
-    toast.success("Item approved");
-  };
+  const load = useCallback(() => setChecks(store.getAll<ComplianceCheck>(KEY)), []);
+  useEffect(() => { load(); }, [load]);
 
-  const handleReject = (id: number) => {
-    setAuditLog(log => log.map(l => l.id === id ? { ...l, status: "rejected" } : l));
-    toast.error("Item rejected — flagged for revision");
-  };
+  function runCheck() {
+    setRunning(true);
+    setTimeout(() => {
+      const creatives = store.getAll<{id: string; headline: string}>("creatives");
+      const campaigns = store.getAll<{id: string; name: string}>("campaigns");
+      const targets = [...creatives.map(c => ({ type: "creative", name: c.headline, id: c.id })), ...campaigns.map(c => ({ type: "campaign", name: c.name, id: c.id }))];
+      if (targets.length === 0) { setRunning(false); return; }
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      const numIssues = Math.floor(Math.random() * 4);
+      const shuffled = [...RULES].sort(() => Math.random() - 0.5).slice(0, numIssues);
+      const issues: ComplianceIssue[] = shuffled.map((r, i) => ({ id: `ci-${Date.now()}-${i}`, ...r, resolved: false }));
+      const check: ComplianceCheck = { id: `cc-${Date.now()}`, targetType: target.type, targetName: target.name, status: numIssues === 0 ? "passed" : "failed", issues, runAt: new Date().toISOString(), resolvedCount: 0 };
+      store.create(KEY, check);
+      setRunning(false); load();
+    }, 1500);
+  }
 
-  const toggleRule = (id: number) => {
-    setRules(r => r.map(rule => rule.id === id ? { ...rule, active: !rule.active } : rule));
-    const rule = rules.find(r => r.id === id);
-    toast(rule?.active ? "Rule disabled" : "Rule enabled", rule?.active ? "warning" : "success");
-  };
+  function resolveIssue(checkId: string, issueId: string) {
+    const check = checks.find(c => c.id === checkId);
+    if (!check) return;
+    const updated = check.issues.map(i => i.id === issueId ? { ...i, resolved: true } : i);
+    const resolvedCount = updated.filter(i => i.resolved).length;
+    const status = resolvedCount === updated.length ? "passed" : "failed";
+    store.update<ComplianceCheck>(KEY, checkId, { issues: updated, resolvedCount, status });
+    load();
+  }
 
-  const avgScore = Math.round(SCORES.reduce((s, a) => s + a.score, 0) / SCORES.length);
+  const totalChecks = checks.length;
+  const passed = checks.filter(c => c.status === "passed").length;
+  const failed = checks.filter(c => c.status === "failed").length;
+  const openIssues = checks.reduce((s, c) => s + c.issues.filter(i => !i.resolved).length, 0);
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Compliance</h1>
-        <p className="text-slate-400 text-sm mt-0.5">AI-enforced compliance across all verticals</p>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div><h1 className="text-2xl font-bold">Compliance</h1><p className="text-slate-400 text-sm mt-1">Insurance regulatory compliance scanning</p></div>
+          <button onClick={runCheck} disabled={running} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold">{running ? "Scanning..." : "Run Compliance Check"}</button>
+        </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Compliance Score by Vertical</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <PieChart>
-              <Pie data={donutData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
-                {donutData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie>
-              <Tooltip content={<ChartTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-2 text-center">
-            <p className="text-3xl font-bold text-emerald-400">{avgScore}%</p>
-            <p className="text-xs text-slate-500">Overall Compliance Score</p>
-          </div>
-        </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[{ l: "Total Checks", v: totalChecks, c: "text-blue-400" }, { l: "Passed", v: passed, c: "text-emerald-400" }, { l: "Failed", v: failed, c: "text-red-400" }, { l: "Open Issues", v: openIssues, c: "text-amber-400" }].map(s => (
+            <Card key={s.l} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+              <div className="text-xs text-slate-500 uppercase mb-2">{s.l}</div>
+              <div className={cn("text-2xl font-bold", s.c)}>{s.v}</div>
+            </Card>
+          ))}
+        </div>
 
-        <Card className="xl:col-span-2 p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Vertical Breakdown</h3>
-          <div className="space-y-4">
-            {SCORES.map(s => (
-              <div key={s.vertical}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-white font-medium">{s.vertical}</span>
-                  <div className="flex items-center gap-3">
-                    {s.violations > 0 ? (
-                      <span className="text-xs text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{s.violations} violation{s.violations > 1 ? "s" : ""}</span>
-                    ) : (
-                      <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Clean</span>
-                    )}
-                    <span className="text-sm font-bold" style={{ color: s.color }}>{s.score}%</span>
-                  </div>
-                </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s.score}%`, backgroundColor: s.color }} />
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">{s.rules} rules monitored</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Card className="p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <h3 className="text-sm font-semibold text-white">Recent Audit Log</h3>
-          </div>
+        {checks.length === 0 ? (
+          <div className="text-center py-16"><div className="text-4xl mb-4">&#x1f6e1;</div><h3 className="text-lg font-semibold text-white mb-2">No compliance checks yet</h3><p className="text-slate-400 text-sm max-w-sm mx-auto">Run your first compliance scan on your creatives and campaigns.</p></div>
+        ) : (
           <div className="space-y-3">
-            {auditLog.map(item => (
-              <div key={item.id} className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/30">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-xs text-slate-300 flex-1">{item.item}</p>
-                  <span className="text-xs text-slate-500 flex-shrink-0">{item.time}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("text-xs px-1.5 py-0.5 rounded border font-medium capitalize", severityColors[item.severity])}>{item.severity}</span>
-                    <span className="text-xs text-slate-500">{item.vertical} · {item.agent}</span>
-                  </div>
-                  {item.status === "pending" ? (
-                    <div className="flex gap-1.5">
-                      <button onClick={() => handleApprove(item.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors">
-                        <CheckCircle className="w-3 h-3" /> Approve
-                      </button>
-                      <button onClick={() => handleReject(item.id)} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition-colors">
-                        <XCircle className="w-3 h-3" /> Reject
-                      </button>
+            {checks.slice().reverse().map(check => {
+              const open = check.issues.filter(i => !i.resolved).length;
+              return (
+                <Card key={check.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                  <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpanded(expanded === check.id ? null : check.id)}>
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-3 h-3 rounded-full", check.status === "passed" ? "bg-emerald-400" : "bg-red-400")} />
+                      <div><p className="text-sm font-semibold text-white">{check.targetName}</p><p className="text-xs text-slate-500">{check.targetType} &middot; {new Date(check.runAt).toLocaleString()}</p></div>
                     </div>
-                  ) : (
-                    <span className={cn("text-xs font-medium capitalize flex items-center gap-1", item.status === "approved" ? "text-emerald-400" : "text-rose-400")}>
-                      {item.status === "approved" ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                      {item.status}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-4 h-4 text-slate-400" />
-            <h3 className="text-sm font-semibold text-white">Compliance Rules</h3>
-          </div>
-          <div className="space-y-2">
-            {rules.map(rule => (
-              <div key={rule.id} className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700/30">
-                <button onClick={() => toggleRule(rule.id)} className={cn("mt-0.5 w-9 h-5 rounded-full transition-colors flex-shrink-0 relative", rule.active ? "bg-emerald-500" : "bg-slate-600")}>
-                  <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all shadow", rule.active ? "left-4" : "left-0.5")} />
-                </button>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-300">{rule.rule}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={cn("text-xs px-1.5 py-0.5 rounded border font-medium capitalize", severityColors[rule.severity])}>{rule.severity}</span>
-                    <span className="text-xs text-slate-500">{rule.vertical}</span>
+                    <div className="flex items-center gap-2">
+                      {open > 0 && <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">{open} open</span>}
+                      <span className="text-xs text-slate-500">{expanded === check.id ? "v" : ">"}</span>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                  {expanded === check.id && check.issues.length > 0 && (
+                    <div className="mt-4 space-y-2 pt-3 border-t border-slate-700/50">
+                      {check.issues.map(issue => (
+                        <div key={issue.id} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className={cn("font-medium", SEVERITY_COLORS[issue.severity])}>[{issue.severity}]</span>
+                            <span className={issue.resolved ? "text-slate-600 line-through" : "text-white"}>{issue.rule}</span>
+                          </div>
+                          {!issue.resolved && <button onClick={(e) => { e.stopPropagation(); resolveIssue(check.id, issue.id); }} className="text-emerald-400 hover:text-emerald-300">Resolve</button>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {expanded === check.id && check.issues.length === 0 && <p className="mt-3 text-xs text-emerald-400">All clear - no issues found.</p>}
+                </Card>
+              );
+            })}
           </div>
-        </Card>
+        )}
       </div>
     </div>
   );

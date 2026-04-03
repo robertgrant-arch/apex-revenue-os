@@ -1,185 +1,122 @@
 "use client";
-import { useState } from "react";
-import { Search, ChevronUp, ChevronDown, X } from "lucide-react";
+
+import { useState, useEffect, useCallback } from "react";
 import Card from "@/components/ui/Card";
-import Modal from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
+import * as store from "@/lib/store";
 
-const LEADS = [
-  { id: 1, name: "Margaret Chen", email: "m.chen@email.com", phone: "(555) 201-4421", vertical: "Medicare", status: "hot", score: 94, value: 3200, agent: "ORACLE", source: "Facebook", created: "Mar 28", location: "Phoenix, AZ", notes: "Interested in Medicare Supplement Plan G. Turning 65 in June. High intent." },
-  { id: 2, name: "Robert Williams", email: "rwilliams@gmail.com", phone: "(555) 384-9021", vertical: "Auto", status: "warm", score: 82, value: 1800, agent: "SIGNAL", source: "Google", created: "Mar 27", location: "Dallas, TX", notes: "Comparing rates for 2 vehicles. Currently with State Farm." },
-  { id: 3, name: "Patricia Davis", email: "pdavis@outlook.com", phone: "(555) 112-7744", vertical: "Medicare", status: "hot", score: 91, value: 4100, agent: "ORACLE", source: "Referral", created: "Mar 27", location: "Tampa, FL", notes: "Referred by existing client. Very motivated. Prefers phone contact." },
-  { id: 4, name: "James Thompson", email: "jthompson@yahoo.com", phone: "(555) 829-3301", vertical: "Home", status: "warm", score: 67, value: 2400, agent: "CONVERT", source: "Direct Mail", created: "Mar 26", location: "Atlanta, GA", notes: "New homeowner. Bundling opportunity with auto." },
-  { id: 5, name: "Linda Garcia", email: "lgarcia@email.com", phone: "(555) 447-8812", vertical: "Life", status: "cold", score: 45, value: 1200, agent: "REACH", source: "Organic", created: "Mar 25", location: "Chicago, IL", notes: "Initial inquiry only. No follow-up response yet." },
-  { id: 6, name: "Michael Brown", email: "mbrown@corp.com", phone: "(555) 993-2218", vertical: "Medicare", status: "hot", score: 88, value: 3900, agent: "ORACLE", source: "Facebook", created: "Mar 25", location: "Denver, CO", notes: "Aging-in. Very engaged with email sequence." },
-  { id: 7, name: "Susan Martinez", email: "susan.m@email.com", phone: "(555) 674-0091", vertical: "Auto", status: "warm", score: 74, value: 1600, agent: "SIGNAL", source: "Google", created: "Mar 24", location: "Houston, TX", notes: "Multi-car household. Price sensitive." },
-  { id: 8, name: "David Lee", email: "dlee@gmail.com", phone: "(555) 231-5588", vertical: "Life", status: "hot", score: 87, value: 5200, agent: "CONVERT", source: "Referral", created: "Mar 23", location: "Seattle, WA", notes: "Business owner seeking key-man coverage. High LTV." },
-  { id: 9, name: "Barbara Wilson", email: "bwilson@net.com", phone: "(555) 908-3312", vertical: "Medicare", status: "cold", score: 38, value: 900, agent: "ORACLE", source: "Direct Mail", created: "Mar 22", location: "Miami, FL", notes: "Received mailer. Called in but hesitant. Follow-up in 30 days." },
-  { id: 10, name: "Thomas Anderson", email: "tanderson@isp.net", phone: "(555) 552-7761", vertical: "Home", status: "warm", score: 71, value: 2100, agent: "ARCHITECT", source: "Organic", created: "Mar 21", location: "Portland, OR", notes: "Inherited property. First-time homeowner insurance." },
-];
+interface Lead {
+  id: string; name: string; email: string; phone: string;
+  vertical: string; source: string; value: number; score: number;
+  status: string; createdAt: string;
+}
 
-type SortKey = "name" | "score" | "value" | "created";
-type SortDir = "asc" | "desc";
-
-const statusColors: Record<string, string> = {
-  hot: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-  warm: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  cold: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-};
+const KEY = "leads";
+const VERTICALS = ["Medicare", "Auto", "Life", "Home"];
+const STATUSES = ["new", "contacted", "qualified", "converted", "lost"];
+const STATUS_COLORS: Record<string, string> = { new: "bg-blue-500/20 text-blue-400", contacted: "bg-amber-500/20 text-amber-400", qualified: "bg-emerald-500/20 text-emerald-400", converted: "bg-violet-500/20 text-violet-400", lost: "bg-red-500/20 text-red-400" };
 
 export default function LeadsPage() {
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [verticalFilter, setVerticalFilter] = useState("All");
-  const [sortKey, setSortKey] = useState<SortKey>("score");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [selectedLead, setSelectedLead] = useState<typeof LEADS[0] | null>(null);
+  const [vFilter, setVFilter] = useState("All");
+  const [sFilter, setSFilter] = useState("All");
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", vertical: "Medicare", source: "", value: "", score: "0" });
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
-  };
+  const load = useCallback(() => setLeads(store.getAll<Lead>(KEY)), []);
+  useEffect(() => { load(); }, [load]);
 
-  const filtered = LEADS
-    .filter(l => {
-      const matchSearch = l.name.toLowerCase().includes(search.toLowerCase()) || l.email.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === "All" || l.status === statusFilter;
-      const matchVertical = verticalFilter === "All" || l.vertical === verticalFilter;
-      return matchSearch && matchStatus && matchVertical;
-    })
-    .sort((a, b) => {
-      let av: string | number = a[sortKey];
-      let bv: string | number = b[sortKey];
-      if (sortKey === "value") { av = a.value; bv = b.value; }
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
+  const filtered = leads.filter(l => {
+    const q = search.toLowerCase();
+    return (!q || l.name.toLowerCase().includes(q) || l.email.toLowerCase().includes(q)) &&
+      (vFilter === "All" || l.vertical === vFilter) && (sFilter === "All" || l.status === sFilter);
+  });
 
-  const SortIcon = ({ col }: { col: SortKey }) => (
-    <span className="ml-1 inline-flex flex-col">
-      <ChevronUp className={cn("w-2.5 h-2.5", sortKey === col && sortDir === "asc" ? "text-emerald-400" : "text-slate-600")} />
-      <ChevronDown className={cn("w-2.5 h-2.5 -mt-1", sortKey === col && sortDir === "desc" ? "text-emerald-400" : "text-slate-600")} />
-    </span>
-  );
+  function handleCreate() {
+    if (!form.name) return;
+    store.create<Lead>(KEY, { id: `lead-${Date.now()}`, name: form.name, email: form.email, phone: form.phone, vertical: form.vertical, source: form.source, value: Number(form.value) || 0, score: Number(form.score) || 0, status: "new", createdAt: new Date().toISOString() });
+    setForm({ name: "", email: "", phone: "", vertical: "Medicare", source: "", value: "", score: "0" });
+    setShowModal(false); load();
+  }
+
+  function handleStatus(id: string, status: string) { store.update<Lead>(KEY, id, { status }); load(); }
+  function handleDelete(id: string) { store.remove(KEY, id); load(); }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Leads</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{LEADS.length} total leads · {LEADS.filter(l => l.status === "hot").length} hot</p>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div><h1 className="text-2xl font-bold">Leads</h1><p className="text-slate-400 text-sm mt-1">Manage your lead pipeline</p></div>
+          <button onClick={() => setShowModal(true)} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold">Add Lead</button>
         </div>
-      </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email..." className="w-full pl-9 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50" />
-        </div>
-        <div className="flex gap-1">
-          {["All", "hot", "warm", "cold"].map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)} className={cn("px-2.5 py-2 text-xs rounded-lg font-medium capitalize transition-all border", statusFilter === s ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-white")}>
-              {s}
-            </button>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[{ l: "Total Leads", v: leads.length }, { l: "Qualified", v: leads.filter(l => l.status === "qualified").length }, { l: "Converted", v: leads.filter(l => l.status === "converted").length }, { l: "Pipeline Value", v: `$${leads.reduce((s, l) => s + l.value, 0).toLocaleString()}` }].map(s => (
+            <Card key={s.l} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+              <div className="text-xs text-slate-500 uppercase mb-2">{s.l}</div>
+              <div className="text-2xl font-bold text-emerald-400">{s.v}</div>
+            </Card>
           ))}
         </div>
-        <div className="flex gap-1">
-          {["All", "Medicare", "Auto", "Life", "Home"].map(v => (
-            <button key={v} onClick={() => setVerticalFilter(v)} className={cn("px-2.5 py-2 text-xs rounded-lg font-medium transition-all border", verticalFilter === v ? "bg-violet-500/20 text-violet-400 border-violet-500/30" : "bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-white")}>
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer select-none" onClick={() => handleSort("name")}>Name <SortIcon col="name" /></th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Vertical</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer select-none" onClick={() => handleSort("score")}>Score <SortIcon col="score" /></th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer select-none" onClick={() => handleSort("value")}>Value <SortIcon col="value" /></th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Agent</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">Source</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 cursor-pointer select-none" onClick={() => handleSort("created")}>Created <SortIcon col="created" /></th>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input type="text" placeholder="Search leads..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-slate-500" />
+          <select value={vFilter} onChange={e => setVFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm">
+            <option>All</option>{VERTICALS.map(v => <option key={v}>{v}</option>)}
+          </select>
+          <select value={sFilter} onChange={e => setSFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm">
+            <option>All</option>{STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="text-center py-16"><div className="text-4xl mb-4">&#x1f465;</div><h3 className="text-lg font-semibold text-white mb-2">No leads yet</h3><p className="text-slate-400 text-sm">Add your first lead to get started.</p></div>
+        ) : (
+          <div className="overflow-x-auto"><table className="w-full text-sm">
+            <thead><tr className="border-b border-slate-700">
+              {["Name", "Email", "Vertical", "Score", "Value", "Status", ""].map(h => <th key={h} className="text-left text-slate-500 py-3 px-3 text-xs uppercase">{h}</th>)}
+            </tr></thead>
+            <tbody>{filtered.map(l => (
+              <tr key={l.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                <td className="py-3 px-3 text-white font-medium">{l.name}</td>
+                <td className="py-3 px-3 text-slate-400">{l.email}</td>
+                <td className="py-3 px-3 text-slate-400">{l.vertical}</td>
+                <td className="py-3 px-3"><span className={cn("font-semibold", l.score >= 80 ? "text-emerald-400" : l.score >= 50 ? "text-amber-400" : "text-slate-400")}>{l.score}</span></td>
+                <td className="py-3 px-3 text-slate-300">${l.value.toLocaleString()}</td>
+                <td className="py-3 px-3"><select value={l.status} onChange={e => handleStatus(l.id, e.target.value)} className="text-xs bg-slate-700 text-slate-300 rounded px-2 py-1">
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select></td>
+                <td className="py-3 px-3"><button onClick={() => handleDelete(l.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button></td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/30">
-              {filtered.map(lead => (
-                <tr key={lead.id} onClick={() => setSelectedLead(lead)} className="hover:bg-slate-700/20 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <p className="text-sm text-white font-medium">{lead.name}</p>
-                    <p className="text-xs text-slate-500">{lead.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-400">{lead.vertical}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium capitalize border", statusColors[lead.status])}>{lead.status}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-16 bg-slate-700 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", lead.score >= 85 ? "bg-emerald-500" : lead.score >= 65 ? "bg-amber-500" : "bg-slate-500")} style={{ width: `${lead.score}%` }} />
-                      </div>
-                      <span className={cn("text-sm font-bold", lead.score >= 85 ? "text-emerald-400" : lead.score >= 65 ? "text-amber-400" : "text-slate-400")}>{lead.score}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-white">${lead.value.toLocaleString()}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">{lead.agent}</span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-400">{lead.source}</td>
-                  <td className="px-4 py-3 text-sm text-slate-500">{lead.created}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+            ))}</tbody>
+          </table></div>
+        )}
 
-      <Modal open={!!selectedLead} onClose={() => setSelectedLead(null)} title="Lead Detail" size="lg">
-        {selectedLead && (
-          <div className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-white">{selectedLead.name}</h3>
-                <p className="text-sm text-slate-400">{selectedLead.location}</p>
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" onClick={() => setShowModal(false)} />
+            <div className="relative z-10 w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Add Lead</h3>
+              <div className="space-y-3">
+                <input placeholder="Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <input placeholder="Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <input placeholder="Phone" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <select value={form.vertical} onChange={e => setForm({...form, vertical: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm">
+                  {VERTICALS.map(v => <option key={v}>{v}</option>)}
+                </select>
+                <input placeholder="Source (Google, Meta, etc.)" value={form.source} onChange={e => setForm({...form, source: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <input type="number" placeholder="Value ($)" value={form.value} onChange={e => setForm({...form, value: e.target.value})} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
+                <input type="number" placeholder="Score (0-100)" value={form.score} onChange={e => setForm({...form, score: e.target.value})} min="0" max="100" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className={cn("text-xs px-2.5 py-1 rounded-full font-medium capitalize border", statusColors[selectedLead.status])}>{selectedLead.status}</span>
-                <span className={cn("text-lg font-bold", selectedLead.score >= 85 ? "text-emerald-400" : selectedLead.score >= 65 ? "text-amber-400" : "text-slate-400")}>{selectedLead.score}/100</span>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 text-sm">Cancel</button>
+                <button onClick={handleCreate} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm">Add Lead</button>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "Email", value: selectedLead.email },
-                { label: "Phone", value: selectedLead.phone },
-                { label: "Vertical", value: selectedLead.vertical },
-                { label: "Source", value: selectedLead.source },
-                { label: "Assigned Agent", value: selectedLead.agent },
-                { label: "Est. Value", value: `$${selectedLead.value.toLocaleString()}` },
-              ].map(f => (
-                <div key={f.label} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
-                  <p className="text-xs text-slate-500 mb-0.5">{f.label}</p>
-                  <p className="text-sm text-white font-medium">{f.value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
-              <p className="text-xs text-slate-500 mb-1">Notes</p>
-              <p className="text-sm text-slate-300">{selectedLead.notes}</p>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button className="flex-1 py-2 text-sm rounded-lg font-medium bg-emerald-500 hover:bg-emerald-400 text-white transition-colors">Assign to Agent</button>
-              <button className="flex-1 py-2 text-sm rounded-lg font-medium border border-slate-700 text-slate-400 hover:text-white transition-colors">Send Email</button>
-              <button onClick={() => setSelectedLead(null)} className="p-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-      </Modal>
+      </div>
     </div>
   );
 }
