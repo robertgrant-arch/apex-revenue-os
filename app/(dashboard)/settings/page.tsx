@@ -1,796 +1,483 @@
 "use client";
-
 import { useState } from "react";
 import {
-  Building,
-  Globe,
-  Phone,
-  Calendar,
-  DollarSign,
-  Palette,
-  Bell,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Heart,
-  Scale,
-  Home,
-  Car,
-  Save,
-  Key,
-  Users,
-  Shield,
-  RefreshCw,
-  Copy,
-  Eye,
-  EyeOff,
-  Plus,
-  Trash2,
-  ChevronRight,
-  Zap,
-  Activity,
-  Mail,
-  MessageSquare,
+  User, Bell, Shield, Key, Users, Plug, Save,
+  Plus, Copy, Eye, EyeOff, Check, Trash2
 } from "lucide-react";
-import { TopBar } from "@/components/layout/TopBar";
-import { MetricCard } from "@/components/ui/MetricCard";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { StatusDot } from "@/components/ui/StatusDot";
-import { integrations } from "@/lib/data";
+import Modal from "@/components/ui/Modal";
+import { Toast, useToast } from "@/components/ui/Toast";
 
-const iconMap: Record<string, React.ElementType> = {
-  "Salesforce CRM":   Building,
-  "Google Ads":       Globe,
-  "Meta Ads":         Globe,
-  "Twilio":           Phone,
-  "HubSpot":          Building,
-  "Calendly":         Calendar,
-  "TikTok Ads":       Globe,
-  "Figma":            Palette,
-  "Stripe":           DollarSign,
-  "LinkedIn Ads":     Globe,
-  "Google Calendar":  Calendar,
-  "Slack":            Bell,
-};
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface TeamMember { id: string; name: string; email: string; role: string; status: "active" | "pending"; }
+interface Integration { id: string; name: string; description: string; status: "connected" | "disconnected"; icon: string; }
+interface ApiKey { id: string; name: string; key: string; created: string; lastUsed: string; visible: boolean; }
 
-const categoryColors: Record<string, string> = {
-  CRM:            "#6366f1",
-  "Ad Platform":  "#f59e0b",
-  Communications: "#10b981",
-  Calendar:       "#3b82f6",
-  Creative:       "#ec4899",
-  Revenue:        "#34d399",
-  Notifications:  "#8b5cf6",
-};
-
-const VERTICALS_INIT = [
-  { v: "Medicare",       active: true,  Icon: Heart,      color: "#3b82f6" },
-  { v: "Auto Insurance", active: true,  Icon: Car,        color: "#f59e0b" },
-  { v: "Personal Injury",active: true,  Icon: Scale,      color: "#8b5cf6" },
-  { v: "Home Services",  active: true,  Icon: Home,       color: "#10b981" },
-  { v: "Debt Settlement",active: false, Icon: DollarSign, color: "#6b7280" },
-  { v: "SaaS / B2B",    active: false, Icon: Globe,      color: "#6b7280" },
+// ── Mock Data ──────────────────────────────────────────────────────────────────
+const INIT_MEMBERS: TeamMember[] = [
+  { id: "m1", name: "Bob Grant", email: "robert.grant@selectquote.com", role: "Admin", status: "active" },
+  { id: "m2", name: "Jane Martinez", email: "j.martinez@selectquote.com", role: "Agent", status: "active" },
+  { id: "m3", name: "Lee Chen", email: "l.chen@selectquote.com", role: "Analyst", status: "pending" },
 ];
 
-const NOTIFICATION_PREFS = [
-  { label: "New Appointment Booked",        channel: "Slack + Email", icon: Calendar,     on: true  },
-  { label: "Compliance Flag Triggered",     channel: "Slack + SMS",   icon: Shield,       on: true  },
-  { label: "Agent Decision (High Impact)",  channel: "Slack",         icon: Zap,          on: true  },
-  { label: "Daily Revenue Summary",         channel: "Email",         icon: Mail,         on: true  },
-  { label: "Lead Score Threshold (90+)",    channel: "SMS",           icon: Activity,     on: true  },
-  { label: "Experiment Significance Hit",   channel: "Slack",         icon: RefreshCw,    on: false },
-  { label: "Compliance Approval Needed",    channel: "Email + Slack", icon: AlertTriangle,on: true  },
-  { label: "Weekly Performance Digest",     channel: "Email",         icon: MessageSquare,on: false },
+const INIT_INTEGRATIONS: Integration[] = [
+  { id: "i1", name: "Salesforce", description: "CRM sync and lead handoff", status: "connected", icon: "S" },
+  { id: "i2", name: "Google Ads", description: "Campaign management and performance data", status: "connected", icon: "G" },
+  { id: "i3", name: "Facebook Ads", description: "Social campaign automation", status: "connected", icon: "F" },
+  { id: "i4", name: "HubSpot", description: "Marketing automation and email sequences", status: "disconnected", icon: "H" },
+  { id: "i5", name: "Twilio", description: "SMS and voice communication", status: "disconnected", icon: "T" },
+  { id: "i6", name: "Stripe", description: "Billing and payment processing", status: "disconnected", icon: "St" },
 ];
 
-type TabKey = "integrations" | "verticals" | "account" | "team" | "notifications";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "integrations",  label: "Integrations" },
-  { key: "verticals",     label: "Verticals" },
-  { key: "account",       label: "Account" },
-  { key: "team",          label: "Team" },
-  { key: "notifications", label: "Notifications" },
+const INIT_KEYS: ApiKey[] = [
+  { id: "k1", name: "Production Key", key: "apex_prod_sk_4f8a2b3c9d1e5f7a", created: "2025-06-01", lastUsed: "2025-07-14", visible: false },
+  { id: "k2", name: "Development Key", key: "apex_dev_sk_1a2b3c4d5e6f7a8b", created: "2025-06-15", lastUsed: "2025-07-13", visible: false },
 ];
 
-const TEAM_MEMBERS = [
-  { name: "Jason Davis",    email: "jason@apexrevenue.com",    role: "Admin",    avatar: "JD", active: true  },
-  { name: "Maria Santos",   email: "maria@apexrevenue.com",    role: "Manager",  avatar: "MS", active: true  },
-  { name: "Tyler Nguyen",   email: "tyler@apexrevenue.com",    role: "Setter",   avatar: "TN", active: true  },
-  { name: "Aisha Okonkwo",  email: "aisha@apexrevenue.com",    role: "Setter",   avatar: "AO", active: true  },
-  { name: "Brad Harrison",  email: "brad@apexrevenue.com",     role: "Closer",   avatar: "BH", active: false },
-  { name: "Rachel Kim",     email: "rachel@apexrevenue.com",   role: "Closer",   avatar: "RK", active: true  },
-  { name: "Devon Marsh",    email: "devon@apexrevenue.com",    role: "Analyst",  avatar: "DM", active: true  },
-  { name: "Sophie Lin",     email: "sophie@apexrevenue.com",   role: "Analyst",  avatar: "SL", active: false },
+const TABS = [
+  { id: "profile", label: "Profile", icon: <User size={16} /> },
+  { id: "team", label: "Team", icon: <Users size={16} /> },
+  { id: "integrations", label: "Integrations", icon: <Plug size={16} /> },
+  { id: "notifications", label: "Notifications", icon: <Bell size={16} /> },
+  { id: "security", label: "Security", icon: <Shield size={16} /> },
+  { id: "api", label: "API Keys", icon: <Key size={16} /> },
 ];
 
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const [activeTab, setActiveTab]       = useState<TabKey>("integrations");
-  const [verticals, setVerticals]       = useState(VERTICALS_INIT);
-  const [notifications, setNotifications] = useState(NOTIFICATION_PREFS);
-  const [apiVisible, setApiVisible]     = useState(false);
-  const [saved, setSaved]               = useState(false);
-  const [copied, setCopied]             = useState(false);
+  const { toasts, addToast, removeToast } = useToast();
+  const [activeTab, setActiveTab] = useState("profile");
+  const [members, setMembers] = useState<TeamMember[]>(INIT_MEMBERS);
+  const [integrations, setIntegrations] = useState<Integration[]>(INIT_INTEGRATIONS);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>(INIT_KEYS);
 
-  const toggleVertical = (idx: number) => {
-    setVerticals((v) =>
-      v.map((item, i) => (i === idx ? { ...item, active: !item.active } : item))
-    );
+  // Profile form
+  const [profile, setProfile] = useState({ name: "Bob Grant", email: "robert.grant@selectquote.com", company: "SelectQuote", role: "Product / Strategy" });
+
+  // Notification prefs
+  const [notifs, setNotifs] = useState({ leadAlerts: true, complianceFlags: true, campaignReports: false, agentErrors: true, weeklyDigest: true });
+
+  // Invite modal
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: "", role: "Agent" });
+
+  // Connect modal
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [connectTarget, setConnectTarget] = useState<Integration | null>(null);
+  const [connectForm, setConnectForm] = useState({ apiKey: "", accountId: "" });
+
+  // New API Key modal
+  const [newKeyOpen, setNewKeyOpen] = useState(false);
+  const [newKeyName, setNewKeyName] = useState("");
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleSaveProfile = () => {
+    if (!profile.name.trim()) { addToast("Name is required", "error"); return; }
+    addToast("Profile saved successfully", "success");
   };
 
-  const toggleNotif = (idx: number) => {
-    setNotifications((n) =>
-      n.map((item, i) => (i === idx ? { ...item, on: !item.on } : item))
-    );
+  const handleSaveNotifs = () => {
+    addToast("Notification preferences saved", "success");
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleInvite = () => {
+    if (!inviteForm.email.trim() || !inviteForm.email.includes("@")) { addToast("Valid email required", "error"); return; }
+    const nm: TeamMember = {
+      id: `m${Date.now()}`, name: inviteForm.email.split("@")[0], email: inviteForm.email, role: inviteForm.role, status: "pending",
+    };
+    setMembers((p) => [...p, nm]);
+    setInviteOpen(false);
+    setInviteForm({ email: "", role: "Agent" });
+    addToast(`Invite sent to ${inviteForm.email}`, "success");
   };
 
-  const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const handleConnect = () => {
+    if (!connectForm.apiKey.trim()) { addToast("API key is required", "error"); return; }
+    if (!connectTarget) return;
+    setIntegrations((prev) => prev.map((i) => i.id === connectTarget.id ? { ...i, status: "connected" } : i));
+    setConnectOpen(false);
+    setConnectForm({ apiKey: "", accountId: "" });
+    addToast(`${connectTarget.name} connected successfully`, "success");
   };
 
-  const connectedCount = integrations.filter(
-    (i) => i.status === "connected"
-  ).length;
+  const handleDisconnect = (id: string) => {
+    setIntegrations((prev) => prev.map((i) => i.id === id ? { ...i, status: "disconnected" } : i));
+    const integration = integrations.find((i) => i.id === id);
+    addToast(`${integration?.name} disconnected`, "info");
+  };
 
+  const handleNewKey = () => {
+    if (!newKeyName.trim()) { addToast("Key name is required", "error"); return; }
+    const nk: ApiKey = {
+      id: `k${Date.now()}`, name: newKeyName,
+      key: `apex_${newKeyName.toLowerCase().replace(/\s+/g, "_")}_sk_${Math.random().toString(36).slice(2, 18)}`,
+      created: new Date().toISOString().slice(0, 10), lastUsed: "Never", visible: true,
+    };
+    setApiKeys((p) => [nk, ...p]);
+    setNewKeyOpen(false);
+    setNewKeyName("");
+    addToast(`API key "${nk.name}" created`, "success");
+  };
+
+  const toggleKeyVisibility = (id: string) => {
+    setApiKeys((prev) => prev.map((k) => k.id === id ? { ...k, visible: !k.visible } : k));
+  };
+
+  const copyKey = (key: string) => {
+    navigator.clipboard.writeText(key).then(() => addToast("API key copied to clipboard", "success"));
+  };
+
+  const deleteKey = (id: string) => {
+    const key = apiKeys.find((k) => k.id === id);
+    setApiKeys((p) => p.filter((k) => k.id !== id));
+    addToast(`Key "${key?.name}" deleted`, "info");
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <>
-      <TopBar title="Settings & Integrations" subtitle="Account configuration" />
-      <div className="p-6 space-y-6">
+    <div className="p-6">
+      <Toast toasts={toasts} removeToast={removeToast} />
 
-        {/* ── KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Connected Integrations"
-            value={`${connectedCount} / ${integrations.length}`}
-            icon={Globe}
-            color="#10b981"
-          />
-          <MetricCard
-            label="Active Verticals"
-            value={`${verticals.filter((v) => v.active).length} / ${verticals.length}`}
-            icon={Shield}
-            color="#6366f1"
-          />
-          <MetricCard
-            label="API Uptime (30d)"
-            value="99.9%"
-            sub="All systems operational"
-            icon={Activity}
-            color="#10b981"
-          />
-          <MetricCard
-            label="Team Members"
-            value={String(TEAM_MEMBERS.filter((m) => m.active).length)}
-            sub={`${TEAM_MEMBERS.filter((m) => !m.active).length} inactive`}
-            icon={Users}
-            color="#f59e0b"
-          />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <p className="text-slate-400 text-sm mt-1">Manage your account, team, and integrations</p>
+      </div>
+
+      <div className="flex gap-6">
+        {/* Sidebar Nav */}
+        <div className="w-52 shrink-0">
+          <nav className="space-y-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                  activeTab === tab.id
+                    ? "bg-violet-600/20 text-violet-400 border border-violet-500/20"
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* ── Tab bar ── */}
-        <div className="flex gap-1.5 flex-wrap">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`text-xs px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === t.key
-                  ? "bg-emerald-500 text-white"
-                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-white"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ─────────────────────────────────────────────── */}
-        {/* INTEGRATIONS tab                               */}
-        {/* ─────────────────────────────────────────────── */}
-        {activeTab === "integrations" && (
-          <div className="space-y-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white">
-                  All Integrations
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    className="flex items-center gap-1.5 text-xs border border-slate-700 text-slate-400 px-3 py-1.5 rounded-lg hover:border-slate-500 transition-colors"
-                    onClick={() => {}}
-                  >
-                    <RefreshCw size={12} />
-                    Sync All
-                  </button>
-                  <button className="flex items-center gap-1.5 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
-                    <Plus size={12} />
-                    Add Integration
-                  </button>
-                </div>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {/* ── Profile ── */}
+          {activeTab === "profile" && (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
+              <h2 className="text-base font-semibold text-white mb-4">Profile Settings</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: "Full Name", key: "name", placeholder: "Your full name" },
+                  { label: "Email", key: "email", placeholder: "your@email.com" },
+                  { label: "Company", key: "company", placeholder: "Company name" },
+                  { label: "Role", key: "role", placeholder: "Your role" },
+                ].map(({ label, key, placeholder }) => (
+                  <div key={key}>
+                    <label className="block text-sm text-slate-400 mb-1.5">{label}</label>
+                    <input
+                      value={profile[key as keyof typeof profile]}
+                      onChange={(e) => setProfile((p) => ({ ...p, [key]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+                    />
+                  </div>
+                ))}
               </div>
+              <div className="flex justify-end pt-2">
+                <button onClick={handleSaveProfile} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+                  <Save size={15} /> Save Changes
+                </button>
+              </div>
+            </div>
+          )}
 
-              {/* Group by category */}
-              {Array.from(new Set(integrations.map((i) => i.category))).map(
-                (cat) => {
-                  const items = integrations.filter((i) => i.category === cat);
-                  const catColor = categoryColors[cat] ?? "#64748b";
+          {/* ── Team ── */}
+          {activeTab === "team" && (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+                <h2 className="text-base font-semibold text-white">Team Members</h2>
+                <button
+                  onClick={() => setInviteOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all"
+                >
+                  <Plus size={15} /> Invite Member
+                </button>
+              </div>
+              <div className="divide-y divide-slate-700/30">
+                {members.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400 text-sm font-semibold">
+                        {m.name[0]}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-white">{m.name}</div>
+                        <div className="text-xs text-slate-500">{m.email}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-400">{m.role}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs border ${m.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
+                        {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Integrations ── */}
+          {activeTab === "integrations" && (
+            <div className="grid grid-cols-1 gap-4">
+              {integrations.map((intg) => (
+                <div key={intg.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center text-sm font-bold text-white">
+                      {intg.icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-white">{intg.name}</div>
+                      <div className="text-xs text-slate-500">{intg.description}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`flex items-center gap-1.5 text-xs ${intg.status === "connected" ? "text-emerald-400" : "text-slate-500"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${intg.status === "connected" ? "bg-emerald-400" : "bg-slate-600"}`} />
+                      {intg.status === "connected" ? "Connected" : "Disconnected"}
+                    </span>
+                    {intg.status === "connected" ? (
+                      <button
+                        onClick={() => handleDisconnect(intg.id)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs transition-all border border-slate-600/50"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setConnectTarget(intg); setConnectForm({ apiKey: "", accountId: "" }); setConnectOpen(true); }}
+                        className="px-3 py-1.5 rounded-lg bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 text-xs transition-all border border-violet-500/20"
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Notifications ── */}
+          {activeTab === "notifications" && (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
+              <h2 className="text-base font-semibold text-white mb-4">Notification Preferences</h2>
+              <div className="space-y-3">
+                {(Object.entries(notifs) as [keyof typeof notifs, boolean][]).map(([key, val]) => {
+                  const labels: Record<keyof typeof notifs, string> = {
+                    leadAlerts: "New high-score lead alerts",
+                    complianceFlags: "Compliance flags and rejections",
+                    campaignReports: "Daily campaign performance reports",
+                    agentErrors: "Agent error and anomaly alerts",
+                    weeklyDigest: "Weekly revenue digest email",
+                  };
                   return (
-                    <div key={cat} className="mb-5">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className="text-xs font-semibold"
-                          style={{ color: catColor }}
-                        >
-                          {cat}
-                        </span>
-                        <div className="flex-1 h-px bg-slate-800" />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {items.map((int) => {
-                          const Icon = iconMap[int.name] ?? Globe;
-                          return (
-                            <div
-                              key={int.name}
-                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                                int.status === "warning"
-                                  ? "bg-amber-500/5 border-amber-500/20"
-                                  : int.status === "disconnected"
-                                  ? "bg-slate-900/30 border-slate-800"
-                                  : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
-                              }`}
-                            >
-                              <div
-                                className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                                style={{ background: catColor + "15" }}
-                              >
-                                <Icon size={16} style={{ color: catColor }} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-white">
-                                  {int.name}
-                                </div>
-                                <div className="text-xs text-slate-500 truncate">
-                                  {int.description}
-                                </div>
-                                <div className="text-[10px] text-slate-600 mt-0.5">
-                                  Last sync: {int.lastSync}
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                <div
-                                  className={`flex items-center gap-1 text-xs ${
-                                    int.status === "connected"
-                                      ? "text-emerald-400"
-                                      : int.status === "warning"
-                                      ? "text-amber-400"
-                                      : "text-slate-500"
-                                  }`}
-                                >
-                                  {int.status === "connected"    && <CheckCircle2  size={11} />}
-                                  {int.status === "warning"      && <AlertTriangle size={11} />}
-                                  {int.status === "disconnected" && <XCircle       size={11} />}
-                                  <span className="capitalize">{int.status}</span>
-                                </div>
-                                <button
-                                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-                                    int.status === "disconnected"
-                                      ? "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-                                      : int.status === "warning"
-                                      ? "border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-                                      : "border-slate-700 text-slate-400 hover:border-slate-500"
-                                  }`}
-                                >
-                                  {int.status === "disconnected"
-                                    ? "Connect"
-                                    : int.status === "warning"
-                                    ? "Reconnect"
-                                    : "Manage"}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div key={key} className="flex items-center justify-between py-3 border-b border-slate-700/30 last:border-0">
+                      <span className="text-sm text-slate-300">{labels[key]}</span>
+                      <button
+                        onClick={() => setNotifs((p) => ({ ...p, [key]: !val }))}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${val ? "bg-violet-600" : "bg-slate-700"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${val ? "translate-x-5" : "translate-x-0"}`} />
+                      </button>
                     </div>
                   );
-                }
-              )}
-            </Card>
-
-            {/* Webhook configuration */}
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold text-white mb-4">
-                Webhook Configuration
-              </h3>
-              <div className="space-y-3">
-                {[
-                  { event: "lead.created",         endpoint: "https://hook.zapier.com/hooks/catch/apex/lead-new",    active: true  },
-                  { event: "appointment.booked",   endpoint: "https://your-crm.com/webhooks/apex/appointment",       active: true  },
-                  { event: "compliance.flagged",   endpoint: "https://hooks.slack.com/services/T0/B0/apex-compliance",active: true  },
-                  { event: "experiment.complete",  endpoint: "https://your-bi.com/apex/experiment",                  active: false },
-                ].map((wh) => (
-                  <div
-                    key={wh.event}
-                    className="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-800"
-                  >
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${wh.active ? "bg-emerald-400" : "bg-slate-600"}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-mono text-emerald-400">
-                        {wh.event}
-                      </div>
-                      <div className="text-xs text-slate-500 truncate">
-                        {wh.endpoint}
-                      </div>
-                    </div>
-                    <button className="text-slate-500 hover:text-slate-300 transition-colors">
-                      <ChevronRight size={12} />
-                    </button>
-                  </div>
-                ))}
-                <button className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors mt-1">
-                  <Plus size={12} />Add webhook
+                })}
+              </div>
+              <div className="flex justify-end pt-2">
+                <button onClick={handleSaveNotifs} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+                  <Save size={15} /> Save Preferences
                 </button>
               </div>
-            </Card>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* ─────────────────────────────────────────────── */}
-        {/* VERTICALS tab                                  */}
-        {/* ─────────────────────────────────────────────── */}
-        {activeTab === "verticals" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white">
-                  Active Verticals
-                </h3>
-                <Badge color="emerald">
-                  {verticals.filter((v) => v.active).length} active
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {verticals.map((item, idx) => (
-                  <div
-                    key={item.v}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                      item.active
-                        ? "bg-slate-900/50 border-slate-700"
-                        : "bg-slate-900/20 border-slate-800"
-                    }`}
-                  >
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all"
-                      style={{ background: item.active ? item.color + "20" : "#1e293b" }}
-                    >
-                      <item.Icon
-                        size={16}
-                        style={{ color: item.active ? item.color : "#475569" }}
+          {/* ── Security ── */}
+          {activeTab === "security" && (
+            <div className="space-y-4">
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+                <h2 className="text-base font-semibold text-white mb-4">Password</h2>
+                <div className="space-y-3">
+                  {["Current Password", "New Password", "Confirm New Password"].map((label) => (
+                    <div key={label}>
+                      <label className="block text-sm text-slate-400 mb-1.5">{label}</label>
+                      <input
+                        type="password"
+                        placeholder="••••••••"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
                       />
-                    </div>
-                    <div className="flex-1">
-                      <div
-                        className={`text-sm font-medium transition-colors ${
-                          item.active ? "text-white" : "text-slate-500"
-                        }`}
-                      >
-                        {item.v}
-                      </div>
-                      {item.active && (
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          All 7 agents active
-                        </div>
-                      )}
-                    </div>
-                    {item.active && (
-                      <Badge color="emerald">Active</Badge>
-                    )}
-                    <button
-                      onClick={() => toggleVertical(idx)}
-                      className={`w-10 h-5 rounded-full flex items-center px-0.5 transition-colors shrink-0 ${
-                        item.active ? "bg-emerald-500" : "bg-slate-700"
-                      }`}
-                      aria-label={`Toggle ${item.v}`}
-                    >
-                      <div
-                        className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                          item.active ? "translate-x-5" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-800">
-                <button className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
-                  <Plus size={12} />Request new vertical
-                </button>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold text-white mb-4">
-                Vertical Configuration
-              </h3>
-              <div className="space-y-4">
-                {verticals
-                  .filter((v) => v.active)
-                  .map((item) => (
-                    <div key={item.v} className="bg-slate-900 rounded-xl p-3 border border-slate-800">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div
-                          className="w-6 h-6 rounded-lg flex items-center justify-center"
-                          style={{ background: item.color + "20" }}
-                        >
-                          <item.Icon size={12} style={{ color: item.color }} />
-                        </div>
-                        <span className="text-xs font-semibold text-white">
-                          {item.v}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                        {[
-                          ["Compliance tier", "Tier 1–2"],
-                          ["Lead target CPL", "$40"],
-                          ["Appt. target",    "80%+ show"],
-                          ["Outreach budget", "Auto"],
-                        ].map(([k, v]) => (
-                          <div key={k} className="flex justify-between">
-                            <span className="text-slate-500">{k}</span>
-                            <span className="text-white font-medium">{v}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <button className="mt-2 text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
-                        Configure <ChevronRight size={10} />
-                      </button>
                     </div>
                   ))}
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* ─────────────────────────────────────────────── */}
-        {/* ACCOUNT tab                                    */}
-        {/* ─────────────────────────────────────────────── */}
-        {activeTab === "account" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Account details */}
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold text-white mb-4">
-                Account Details
-              </h3>
-              <div className="space-y-3">
-                {[
-                  ["Company Name",     "Apex Revenue Inc."         ],
-                  ["Plan",             "Growth ($4,500/mo)"         ],
-                  ["Billing Email",    "billing@apexrevenue.com"    ],
-                  ["Billing Cycle",    "Monthly · Renews May 1"     ],
-                  ["Timezone",         "America/Chicago (CT)"       ],
-                  ["Data Retention",   "24 months"                  ],
-                  ["Support Tier",     "Priority (4hr SLA)"         ],
-                  ["Account ID",       "APX-2024-00841"             ],
-                ].map(([k, v]) => (
-                  <div
-                    key={k}
-                    className="flex items-center justify-between py-1.5 border-b border-slate-800"
+                </div>
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={() => addToast("Password updated successfully", "success")}
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all"
                   >
-                    <span className="text-xs text-slate-400">{k}</span>
-                    <span className="text-xs text-white font-medium">{v}</span>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={handleSave}
-                className={`mt-4 w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-                  saved
-                    ? "bg-emerald-600 text-white"
-                    : "bg-emerald-500 hover:bg-emerald-400 text-white"
-                }`}
-              >
-                {saved ? (
-                  <><CheckCircle2 size={14} />Saved!</>
-                ) : (
-                  <><Save size={14} />Save Changes</>
-                )}
-              </button>
-            </Card>
-
-            {/* API Keys */}
-            <div className="space-y-4">
-              <Card className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-white">API Keys</h3>
-                  <button className="flex items-center gap-1.5 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
-                    <Plus size={12} />New Key
+                    <Save size={15} /> Update Password
                   </button>
                 </div>
-                <div className="space-y-3">
-                  {[
-                    {
-                      label: "Production API Key",
-                      value: apiVisible ? "sk-apex-live-a4f9b2c3d1e0f5a6b7c8d9e0f1a2b3c4-3f9a" : "sk-apex-live-••••••••••••••••••••••••••••••3f9a",
-                      active: true,
-                      env: "Production",
-                    },
-                    {
-                      label: "Staging API Key",
-                      value: "sk-apex-stg-••••••••••••••••••••••••••••••ab12",
-                      active: true,
-                      env: "Staging",
-                    },
-                    {
-                      label: "Webhook Secret",
-                      value: "whsec-••••••••••••••••••••••••••••••cd34",
-                      active: true,
-                      env: "All",
-                    },
-                  ].map((k) => (
-                    <div
-                      key={k.label}
-                      className="p-3 bg-slate-900 rounded-lg border border-slate-800"
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-white">
-                            {k.label}
-                          </span>
-                          <Badge color={k.env === "Production" ? "red" : k.env === "Staging" ? "amber" : "slate"}>
-                            {k.env}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {k.label === "Production API Key" && (
-                            <button
-                              onClick={() => setApiVisible((v) => !v)}
-                              className="text-slate-500 hover:text-slate-300 transition-colors p-0.5"
-                            >
-                              {apiVisible ? <EyeOff size={12} /> : <Eye size={12} />}
-                            </button>
-                          )}
-                          <button
-                            onClick={handleCopy}
-                            className="text-slate-500 hover:text-slate-300 transition-colors p-0.5"
-                          >
-                            {copied ? (
-                              <CheckCircle2 size={12} className="text-emerald-400" />
-                            ) : (
-                              <Copy size={12} />
-                            )}
-                          </button>
-                          <button className="text-slate-500 hover:text-red-400 transition-colors p-0.5">
-                            <RefreshCw size={12} />
-                          </button>
-                        </div>
-                      </div>
-                      <code className="text-xs font-mono text-slate-400 break-all leading-relaxed">
-                        {k.value}
-                      </code>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Danger zone */}
-              <Card className="p-4 border-red-500/20">
-                <h3 className="text-sm font-semibold text-red-400 mb-3">
-                  Danger Zone
-                </h3>
-                <div className="space-y-2">
-                  {[
-                    { label: "Pause all campaigns",  desc: "Stop all active ad spend immediately" },
-                    { label: "Reset all AI agents",  desc: "Clear agent memory and restart learning" },
-                    { label: "Delete account data",  desc: "Permanently remove all leads and data" },
-                  ].map((action) => (
-                    <div
-                      key={action.label}
-                      className="flex items-center justify-between p-2.5 bg-red-500/5 border border-red-500/10 rounded-lg"
-                    >
-                      <div>
-                        <div className="text-xs font-medium text-white">
-                          {action.label}
-                        </div>
-                        <div className="text-xs text-slate-500">{action.desc}</div>
-                      </div>
-                      <button className="text-xs border border-red-500/40 text-red-400 hover:bg-red-500/10 px-2.5 py-1 rounded-lg transition-colors">
-                        {action.label.startsWith("Delete") ? (
-                          <span className="flex items-center gap-1"><Trash2 size={10} />Delete</span>
-                        ) : (
-                          action.label.split(" ")[0]
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* ─────────────────────────────────────────────── */}
-        {/* TEAM tab                                       */}
-        {/* ─────────────────────────────────────────────── */}
-        {activeTab === "team" && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                Team Members
-              </h3>
-              <button className="flex items-center gap-1.5 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
-                <Plus size={12} />Invite Member
-              </button>
-            </div>
-            <div className="space-y-2">
-              {TEAM_MEMBERS.map((m) => (
-                <div
-                  key={m.email}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                    m.active
-                      ? "bg-slate-900/50 border-slate-800 hover:border-slate-700"
-                      : "bg-slate-900/20 border-slate-800/50 opacity-60"
-                  }`}
-                >
-                  <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
-                    {m.avatar}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
-                        {m.name}
-                      </span>
-                      {!m.active && (
-                        <Badge color="slate">Inactive</Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-500 truncate">
-                      {m.email}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge
-                      color={
-                        m.role === "Admin"   ? "red"    :
-                        m.role === "Manager" ? "purple" :
-                        m.role === "Setter"  ? "blue"   :
-                        m.role === "Closer"  ? "emerald": "slate"
-                      }
-                    >
-                      {m.role}
-                    </Badge>
-                    <div className="flex items-center gap-1">
-                      <StatusDot status={m.active ? "active" : "paused"} />
-                    </div>
-                    <button className="text-slate-500 hover:text-slate-300 transition-colors">
-                      <MoreHorizontal size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-              {[
-                ["Admin",   "1"],
-                ["Manager", "1"],
-                ["Setter",  "2"],
-                ["Closer",  "2"],
-              ].map(([role, count]) => (
-                <div key={role} className="bg-slate-900 rounded-lg p-2.5">
-                  <div className="text-sm font-bold text-white">{count}</div>
-                  <div className="text-xs text-slate-500">{role}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {/* ─────────────────────────────────────────────── */}
-        {/* NOTIFICATIONS tab                              */}
-        {/* ─────────────────────────────────────────────── */}
-        {activeTab === "notifications" && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                Notification Preferences
-              </h3>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <span>{notifications.filter((n) => n.on).length} active</span>
-                <span>/</span>
-                <span>{notifications.length} total</span>
               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {notifications.map((n, idx) => (
-                <div
-                  key={n.label}
-                  className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
-                    n.on
-                      ? "bg-slate-900/50 border-slate-700"
-                      : "bg-slate-900/20 border-slate-800 opacity-60"
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                      n.on ? "bg-emerald-500/20" : "bg-slate-800"
-                    }`}
-                  >
-                    <n.icon
-                      size={14}
-                      className={n.on ? "text-emerald-400" : "text-slate-600"}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-medium ${n.on ? "text-white" : "text-slate-500"}`}>
-                      {n.label}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      via {n.channel}
-                    </div>
+
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-white">Two-Factor Authentication</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Add an extra layer of security to your account</div>
                   </div>
                   <button
-                    onClick={() => toggleNotif(idx)}
-                    className={`w-9 h-4.5 h-5 rounded-full flex items-center px-0.5 transition-colors shrink-0 mt-0.5 ${
-                      n.on ? "bg-emerald-500" : "bg-slate-700"
-                    }`}
-                    aria-label={`Toggle ${n.label}`}
+                    onClick={() => addToast("2FA setup — coming soon", "info")}
+                    className="px-4 py-2 rounded-lg bg-slate-700/50 text-slate-300 hover:text-white text-sm transition-all border border-slate-600/50"
                   >
-                    <div
-                      className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                        n.on ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
+                    Enable 2FA
                   </button>
                 </div>
-              ))}
+              </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-              <button
-                onClick={() =>
-                  setNotifications((n) => n.map((i) => ({ ...i, on: true })))
-                }
-                className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-              >
-                Enable all
-              </button>
-              <button
-                onClick={() =>
-                  setNotifications((n) => n.map((i) => ({ ...i, on: false })))
-                }
-                className="text-xs text-slate-400 hover:text-slate-300 transition-colors"
-              >
-                Disable all
-              </button>
-              <button
-                onClick={handleSave}
-                className={`flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg font-medium transition-all ${
-                  saved
-                    ? "bg-emerald-600 text-white"
-                    : "bg-emerald-500 hover:bg-emerald-400 text-white"
-                }`}
-              >
-                {saved ? <><CheckCircle2 size={12} />Saved!</> : <><Save size={12} />Save Preferences</>}
-              </button>
-            </div>
-          </Card>
-        )}
+          )}
 
+          {/* ── API Keys ── */}
+          {activeTab === "api" && (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
+                <div>
+                  <h2 className="text-base font-semibold text-white">API Keys</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Keep these secret — they grant full API access</p>
+                </div>
+                <button
+                  onClick={() => { setNewKeyName(""); setNewKeyOpen(true); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all"
+                >
+                  <Plus size={15} /> New Key
+                </button>
+              </div>
+              <div className="divide-y divide-slate-700/30">
+                {apiKeys.map((k) => (
+                  <div key={k.id} className="px-6 py-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-white">{k.name}</div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => copyKey(k.key)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-all"><Copy size={13} /></button>
+                        <button onClick={() => toggleKeyVisibility(k.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-all">
+                          {k.visible ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                        <button onClick={() => deleteKey(k.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
+                      </div>
+                    </div>
+                    <div className="font-mono text-xs text-slate-400 bg-slate-900/50 rounded-lg px-3 py-2 border border-slate-700/30">
+                      {k.visible ? k.key : k.key.slice(0, 12) + "••••••••••••••••••••"}
+                    </div>
+                    <div className="flex gap-4 mt-2 text-xs text-slate-600">
+                      <span>Created: {k.created}</span>
+                      <span>Last used: {k.lastUsed}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </>
-  );
-}
 
-// Need this import for MoreHorizontal in team tab
-function MoreHorizontal({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
-    </svg>
+      {/* ── Invite Modal ─────────────────────────────────────────────────────── */}
+      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite Team Member">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Email Address <span className="text-red-400">*</span></label>
+            <input
+              value={inviteForm.email}
+              onChange={(e) => setInviteForm((p) => ({ ...p, email: e.target.value }))}
+              type="email"
+              placeholder="colleague@selectquote.com"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Role</label>
+            <select
+              value={inviteForm.role}
+              onChange={(e) => setInviteForm((p) => ({ ...p, role: e.target.value }))}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
+            >
+              {["Admin", "Analyst", "Agent", "Read Only"].map((r) => <option key={r}>{r}</option>)}
+            </select>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setInviteOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleInvite} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+              <Plus size={15} /> Send Invite
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Connect Integration Modal ─────────────────────────────────────────── */}
+      <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title={`Connect ${connectTarget?.name ?? ""}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">{connectTarget?.description}</p>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">API Key / Access Token <span className="text-red-400">*</span></label>
+            <input
+              value={connectForm.apiKey}
+              onChange={(e) => setConnectForm((p) => ({ ...p, apiKey: e.target.value }))}
+              type="password"
+              placeholder="Paste your API key…"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Account ID (optional)</label>
+            <input
+              value={connectForm.accountId}
+              onChange={(e) => setConnectForm((p) => ({ ...p, accountId: e.target.value }))}
+              placeholder="Your account or workspace ID"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setConnectOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleConnect} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+              <Check size={15} /> Connect
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── New API Key Modal ──────────────────────────────────────────────────── */}
+      <Modal open={newKeyOpen} onClose={() => setNewKeyOpen(false)} title="Create New API Key">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Key Name <span className="text-red-400">*</span></label>
+            <input
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="e.g. Staging Key, CI/CD Key"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+            <p className="text-xs text-amber-400">The key will only be shown once. Copy and store it securely before closing this dialog.</p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setNewKeyOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleNewKey} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+              <Key size={15} /> Generate Key
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

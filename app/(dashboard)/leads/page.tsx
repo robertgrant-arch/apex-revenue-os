@@ -1,1021 +1,417 @@
-// app/(dashboard)/leads/page.tsx
 "use client";
-
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
-  useLeads,
-  useDeleteLead,
-  useUpdateLead,
-  type LeadParams,
-} from "@/lib/hooks";
-import Card from "@/components/ui/Card";
-import StatusDot from "@/components/ui/StatusDot";
-import TopBar from "@/components/layout/TopBar";
+  ChevronDown, ChevronRight, Phone, MessageSquare, Mail,
+  CalendarClock, Download, TrendingUp, Users, Target, Clock
+} from "lucide-react";
+import Modal from "@/components/ui/Modal";
+import { Toast, useToast } from "@/components/ui/Toast";
 
-function SkeletonBlock({ className = "" }: { className?: string }) {
-  return (
-    <div className={`animate-pulse rounded-lg bg-slate-800 ${className}`} />
-  );
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  vertical: string;
+  score: number;
+  status: "new" | "contacted" | "qualified" | "converted" | "lost";
+  source: string;
+  agent: string;
+  createdAt: string;
+  age: number;
+  state: string;
+  notes: string;
 }
 
-function LeadRowSkeleton() {
-  return (
-    <tr className="border-b border-slate-800/50">
-      <td className="px-4 py-3.5">
-        <div className="flex items-center gap-3">
-          <SkeletonBlock className="h-9 w-9 rounded-full shrink-0" />
-          <div className="space-y-1.5">
-            <SkeletonBlock className="h-3.5 w-28" />
-            <SkeletonBlock className="h-3 w-20" />
-          </div>
-        </div>
-      </td>
-      <td className="px-4 py-3.5">
-        <SkeletonBlock className="h-3.5 w-20" />
-      </td>
-      <td className="px-4 py-3.5">
-        <SkeletonBlock className="h-5 w-28 rounded-full" />
-      </td>
-      <td className="px-4 py-3.5">
-        <SkeletonBlock className="h-5 w-16 rounded" />
-      </td>
-      <td className="px-4 py-3.5">
-        <div className="flex items-center gap-2">
-          <SkeletonBlock className="h-1.5 w-16 rounded-full" />
-          <SkeletonBlock className="h-3 w-6" />
-        </div>
-      </td>
-      <td className="px-4 py-3.5">
-        <SkeletonBlock className="h-3.5 w-20" />
-      </td>
-      <td className="px-4 py-3.5">
-        <div className="flex items-center gap-1">
-          <SkeletonBlock className="h-7 w-7 rounded-md" />
-          <SkeletonBlock className="h-7 w-7 rounded-md" />
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-const STATUSES = [
-  "ALL",
-  "NEW",
-  "CONTACTED",
-  "QUALIFIED",
-  "APPOINTMENT_SET",
-  "PROPOSAL_SENT",
-  "WON",
-  "LOST",
-  "DISQUALIFIED",
+// ── Mock Data ──────────────────────────────────────────────────────────────────
+const INITIAL_LEADS: Lead[] = [
+  { id: "L-20481", name: "Margaret Thompson", phone: "(555) 234-8901", email: "m.thompson@email.com", vertical: "Medicare", score: 94, status: "new", source: "Google Ads", agent: "Martinez, J.", createdAt: "2025-07-14", age: 67, state: "FL", notes: "Interested in Medicare Advantage Plan G. Has existing coverage expiring Oct 31." },
+  { id: "L-20479", name: "Robert Kincaid", phone: "(555) 887-3214", email: "rkincaid@mail.com", vertical: "Medicare", score: 88, status: "contacted", source: "Facebook", agent: "Chen, L.", createdAt: "2025-07-14", age: 71, state: "AZ", notes: "Called once. Left voicemail. Interested in Part D coverage." },
+  { id: "L-20475", name: "Sandra Williams", phone: "(555) 112-4567", email: "sandraw@gmail.com", vertical: "ACA", score: 61, status: "qualified", source: "Direct Mail", agent: "Davis, R.", createdAt: "2025-07-13", age: 42, state: "TX", notes: "Self-employed, needs individual plan. Budget ~$400/mo." },
+  { id: "L-20468", name: "James Okonkwo", phone: "(555) 543-9012", email: "james.o@work.net", vertical: "Life Insurance", score: 79, status: "contacted", source: "Referral", agent: "Martinez, J.", createdAt: "2025-07-13", age: 38, state: "CA", notes: "Small business owner. Wants $500K term life." },
+  { id: "L-20451", name: "Patricia Nguyen", phone: "(555) 678-2345", email: "pnguyen@email.com", vertical: "Final Expense", score: 72, status: "qualified", source: "Inbound Call", agent: "Chen, L.", createdAt: "2025-07-12", age: 74, state: "OH", notes: "On fixed income. Looking for $15K final expense policy." },
+  { id: "L-20440", name: "David Morrison", phone: "(555) 901-6789", email: "dmorrison@mail.com", vertical: "Medicare", score: 55, status: "new", source: "Google Ads", agent: "Unassigned", createdAt: "2025-07-12", age: 65, state: "PA", notes: "First time enrollee, turning 65 in 3 months." },
 ];
 
-const VERTICALS = ["ALL", "SOLAR", "INSURANCE", "MORTGAGE", "LEGAL"];
+// ── CSV Export ────────────────────────────────────────────────────────────────
+function exportLeadsToCSV(leads: Lead[]) {
+  const headers = ["Lead ID", "Name", "Phone", "Email", "Vertical", "Score", "Status", "Source", "Agent", "Created", "Age", "State"];
+  const rows = leads.map((l) => [
+    l.id, l.name, l.phone, l.email, l.vertical, l.score,
+    l.status, l.source, l.agent, l.createdAt, l.age, l.state,
+  ]);
+  const csv = [headers, ...rows].map((r) => r.map((cell) => `"${cell}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `leads_export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
-const statusStyles: Record<string, string> = {
-  NEW: "bg-slate-500/20 text-slate-300 border-slate-500/30",
-  CONTACTED: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  QUALIFIED: "bg-violet-500/20 text-violet-300 border-violet-500/30",
-  APPOINTMENT_SET: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  PROPOSAL_SENT: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-  WON: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  LOST: "bg-red-500/20 text-red-300 border-red-500/30",
-  DISQUALIFIED: "bg-slate-700/40 text-slate-500 border-slate-600/30",
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const statusConfig: Record<Lead["status"], { label: string; color: string }> = {
+  new: { label: "New", color: "blue" },
+  contacted: { label: "Contacted", color: "amber" },
+  qualified: { label: "Qualified", color: "violet" },
+  converted: { label: "Converted", color: "emerald" },
+  lost: { label: "Lost", color: "red" },
 };
 
-const verticalColors: Record<string, string> = {
-  SOLAR: "bg-amber-500/20 text-amber-300",
-  INSURANCE: "bg-blue-500/20 text-blue-300",
-  MORTGAGE: "bg-emerald-500/20 text-emerald-300",
-  LEGAL: "bg-violet-500/20 text-violet-300",
+const scoreColor = (s: number) => {
+  if (s >= 80) return "text-emerald-400";
+  if (s >= 60) return "text-amber-400";
+  return "text-red-400";
 };
 
-const avatarPalette = [
-  "bg-violet-500",
-  "bg-blue-500",
-  "bg-emerald-500",
-  "bg-amber-500",
-  "bg-rose-500",
-  "bg-indigo-500",
-  "bg-teal-500",
-  "bg-pink-500",
-];
-
-function getAvatarColor(id: string): string {
-  const sum = id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return avatarPalette[sum % avatarPalette.length];
-}
-
-function getInitials(first: string, last: string): string {
-  return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase();
-}
-
-function SortIcon({
-  field,
-  sortBy,
-  sortOrder,
-}: {
-  field: string;
-  sortBy: string;
-  sortOrder: "asc" | "desc";
-}) {
-  if (sortBy !== field) {
-    return (
-      <svg
-        className="w-3.5 h-3.5 text-slate-600"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-        />
-      </svg>
-    );
-  }
-  return sortOrder === "desc" ? (
-    <svg
-      className="w-3.5 h-3.5 text-violet-400"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M19 9l-7 7-7-7"
-      />
-    </svg>
-  ) : (
-    <svg
-      className="w-3.5 h-3.5 text-violet-400"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M5 15l7-7 7 7"
-      />
-    </svg>
-  );
-}
-
-const QUICK_STATUSES = [
-  "CONTACTED",
-  "QUALIFIED",
-  "APPOINTMENT_SET",
-  "PROPOSAL_SENT",
-  "WON",
-  "DISQUALIFIED",
-];
-
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [verticalFilter, setVerticalFilter] = useState("ALL");
-  const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState("createdAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [selectedLead, setSelectedLead] = useState<any | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
+  const { toasts, addToast, removeToast } = useToast();
+  const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearch(value);
-      if (debounceTimer) clearTimeout(debounceTimer);
-      const t = setTimeout(() => {
-        setDebouncedSearch(value);
-        setPage(1);
-      }, 400);
-      setDebounceTimer(t);
-    },
-    [debounceTimer]
-  );
+  // Modals
+  const [callOpen, setCallOpen] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
-  const params: LeadParams = {
-    page,
-    limit: 20,
-    ...(debouncedSearch && { search: debouncedSearch }),
-    ...(statusFilter !== "ALL" && { status: statusFilter }),
-    ...(verticalFilter !== "ALL" && { vertical: verticalFilter }),
-    sortBy,
-    sortOrder,
+  // Action forms
+  const [smsText, setSmsText] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [apptDate, setApptDate] = useState("");
+  const [apptTime, setApptTime] = useState("");
+
+  // ── Open helpers ─────────────────────────────────────────────────────────────
+  const openAction = (lead: Lead, action: "call" | "sms" | "email" | "book") => {
+    setActiveLead(lead);
+    if (action === "call") setCallOpen(true);
+    if (action === "sms") { setSmsText(""); setSmsOpen(true); }
+    if (action === "email") { setEmailSubject(""); setEmailBody(""); setEmailOpen(true); }
+    if (action === "book") { setApptDate(""); setApptTime(""); setBookOpen(true); }
   };
 
-  const { data, isLoading, isError, error } = useLeads(params);
-  const deleteMutation = useDeleteLead();
-  const updateMutation = useUpdateLead();
-
-  const leads: any[] = data?.leads ?? data?.data ?? [];
-  const total: number = data?.total ?? data?.pagination?.total ?? 0;
-  const totalPages: number =
-    data?.totalPages ?? data?.pagination?.totalPages ?? 1;
-
-  const handleSort = useCallback(
-    (field: string) => {
-      if (sortBy === field) {
-        setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
-      } else {
-        setSortBy(field);
-        setSortOrder("desc");
-      }
-      setPage(1);
-    },
-    [sortBy]
-  );
-
-  const handleStatusFilter = (s: string) => {
-    setStatusFilter(s);
-    setPage(1);
+  const markContacted = (leadId: string) => {
+    setLeads((prev) => prev.map((l) => l.id === leadId && l.status === "new" ? { ...l, status: "contacted" } : l));
   };
 
-  const handleVerticalFilter = (v: string) => {
-    setVerticalFilter(v);
-    setPage(1);
+  const handleCall = () => {
+    if (!activeLead) return;
+    markContacted(activeLead.id);
+    setCallOpen(false);
+    addToast(`Initiating call to ${activeLead.name} at ${activeLead.phone}`, "info");
   };
 
-  const clearFilters = () => {
-    setSearch("");
-    setDebouncedSearch("");
-    setStatusFilter("ALL");
-    setVerticalFilter("ALL");
-    setPage(1);
+  const handleSMS = () => {
+    if (!smsText.trim()) { addToast("Message cannot be empty", "error"); return; }
+    if (!activeLead) return;
+    markContacted(activeLead.id);
+    setSmsOpen(false);
+    setSmsText("");
+    addToast(`SMS sent to ${activeLead.name}`, "success");
   };
 
-  const hasFilters =
-    search || statusFilter !== "ALL" || verticalFilter !== "ALL";
+  const handleEmail = () => {
+    if (!emailSubject.trim()) { addToast("Subject is required", "error"); return; }
+    if (!emailBody.trim()) { addToast("Message body is required", "error"); return; }
+    if (!activeLead) return;
+    markContacted(activeLead.id);
+    setEmailOpen(false);
+    setEmailSubject("");
+    setEmailBody("");
+    addToast(`Email sent to ${activeLead.email}`, "success");
+  };
 
-  const columns: { label: string; field: string; sortable: boolean }[] = [
-    { label: "Lead", field: "lastName", sortable: true },
-    { label: "Source", field: "source", sortable: false },
-    { label: "Status", field: "status", sortable: true },
-    { label: "Vertical", field: "vertical", sortable: true },
-    { label: "Score", field: "score", sortable: true },
-    { label: "Created", field: "createdAt", sortable: true },
-    { label: "", field: "", sortable: false },
-  ];
+  const handleBook = () => {
+    if (!apptDate) { addToast("Date is required", "error"); return; }
+    if (!apptTime) { addToast("Time is required", "error"); return; }
+    if (!activeLead) return;
+    setBookOpen(false);
+    addToast(`Appointment booked with ${activeLead.name} on ${apptDate} at ${apptTime}`, "success");
+  };
 
-  const paginationStart = Math.max(
-    1,
-    Math.min(page - 2, totalPages - 4)
-  );
-  const paginationPages = Array.from(
-    { length: Math.min(5, totalPages) },
-    (_, i) => paginationStart + i
-  ).filter((p) => p >= 1 && p <= totalPages);
+  // ── Render ──────────────────────────────────────────────────────────────────
+  const totalLeads = leads.length;
+  const qualifiedLeads = leads.filter((l) => l.status === "qualified" || l.status === "converted").length;
+  const avgScore = leads.reduce((a, l) => a + l.score, 0) / leads.length;
+  const newToday = leads.filter((l) => l.createdAt === "2025-07-14").length;
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950">
-      <TopBar title="Leads" />
+    <div className="p-6 space-y-6">
+      <Toast toasts={toasts} removeToast={removeToast} />
 
-      <main className="flex-1 p-6 space-y-5">
-        {/* ── Toolbar ──────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search by name, email, phone…"
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 text-white placeholder-slate-500 rounded-lg pl-9 pr-8 py-2 text-sm outline-none focus:border-violet-500 transition-colors"
-            />
-            {search && (
-              <button
-                onClick={() => handleSearchChange("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Lead Management</h1>
+          <p className="text-slate-400 text-sm mt-1">AI-scored and prioritized lead pipeline</p>
+        </div>
+        <button
+          onClick={() => { exportLeadsToCSV(leads); addToast("CSV export downloaded", "success"); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-slate-300 hover:text-white hover:bg-slate-700 transition-all text-sm"
+        >
+          <Download size={16} /> Export CSV
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "Total Leads", value: totalLeads, icon: <Users size={18} />, color: "violet" },
+          { label: "New Today", value: newToday, icon: <TrendingUp size={18} />, color: "blue" },
+          { label: "Qualified", value: qualifiedLeads, icon: <Target size={18} />, color: "emerald" },
+          { label: "Avg Score", value: avgScore.toFixed(0), icon: <Clock size={18} />, color: "amber" },
+        ].map((s) => (
+          <div key={s.label} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+            <div className={`w-9 h-9 rounded-lg bg-${s.color}-500/10 flex items-center justify-center text-${s.color}-400 mb-3`}>
+              {s.icon}
+            </div>
+            <div className="text-2xl font-bold text-white">{s.value}</div>
+            <div className="text-slate-400 text-xs mt-0.5">{s.label}</div>
           </div>
+        ))}
+      </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Vertical filter */}
-            <select
-              value={verticalFilter}
-              onChange={(e) => handleVerticalFilter(e.target.value)}
-              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500 transition-colors"
-            >
-              {VERTICALS.map((v) => (
-                <option key={v} value={v}>
-                  {v === "ALL" ? "All Verticals" : v}
-                </option>
-              ))}
-            </select>
-
-            {/* Status filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => handleStatusFilter(e.target.value)}
-              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-500 transition-colors"
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s === "ALL" ? "All Statuses" : s.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-
-            {/* Clear filters */}
-            {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="px-3 py-2 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
-              >
-                Clear
-              </button>
-            )}
-
-            {/* Total count */}
-            {!isLoading && !isError && (
-              <span className="text-xs text-slate-500">
-                {total.toLocaleString()} lead{total !== 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
+      {/* Lead Table */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">All Leads</h2>
+          <span className="text-xs text-slate-500">{leads.length} records</span>
         </div>
 
-        {/* ── Error ────────────────────────────────────────────────── */}
-        {isError && (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center">
-            <svg
-              className="w-8 h-8 text-red-400 mx-auto mb-2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-red-400 font-medium text-sm">
-              Failed to load leads
-            </p>
-            <p className="text-slate-500 text-xs mt-1">
-              {(error as Error)?.message ?? "An unexpected error occurred"}
-            </p>
-          </div>
-        )}
+        {/* Table Header */}
+        <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-slate-700/30 text-xs text-slate-500 font-medium">
+          <div className="col-span-1" />
+          <div className="col-span-3">Lead</div>
+          <div className="col-span-2">Vertical / Source</div>
+          <div className="col-span-1 text-center">Score</div>
+          <div className="col-span-2">Status</div>
+          <div className="col-span-2">Agent</div>
+          <div className="col-span-1">Date</div>
+        </div>
 
-        {/* ── Table ────────────────────────────────────────────────── */}
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  {columns.map(({ label, field, sortable }) => (
-                    <th
-                      key={`${label}-${field}`}
-                      className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap"
-                    >
-                      {sortable && field ? (
-                        <button
-                          onClick={() => handleSort(field)}
-                          className="flex items-center gap-1.5 hover:text-slate-300 transition-colors"
-                        >
-                          {label}
-                          <SortIcon
-                            field={field}
-                            sortBy={sortBy}
-                            sortOrder={sortOrder}
-                          />
-                        </button>
-                      ) : (
-                        label
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+        {/* Rows */}
+        <div className="divide-y divide-slate-700/30">
+          {leads.map((lead) => {
+            const sc = statusConfig[lead.status];
+            const isExpanded = expanded === lead.id;
+            return (
+              <div key={lead.id}>
+                <div
+                  className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-slate-700/20 cursor-pointer transition-colors items-center"
+                  onClick={() => setExpanded(isExpanded ? null : lead.id)}
+                >
+                  <div className="col-span-1 text-slate-500">
+                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                  </div>
+                  <div className="col-span-3">
+                    <div className="text-sm font-medium text-white">{lead.name}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{lead.id} · {lead.state}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-sm text-slate-300">{lead.vertical}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{lead.source}</div>
+                  </div>
+                  <div className={`col-span-1 text-center text-sm font-bold ${scoreColor(lead.score)}`}>
+                    {lead.score}
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs border bg-${sc.color}-500/10 text-${sc.color}-400 border-${sc.color}-500/20`}>
+                      {sc.label}
+                    </span>
+                  </div>
+                  <div className="col-span-2 text-sm text-slate-400">{lead.agent}</div>
+                  <div className="col-span-1 text-xs text-slate-500">{lead.createdAt}</div>
+                </div>
 
-              <tbody>
-                {isLoading ? (
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <LeadRowSkeleton key={i} />
-                  ))
-                ) : leads.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <svg
-                          className="w-12 h-12 text-slate-700"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        <p className="text-slate-500 text-sm">No leads found</p>
-                        {hasFilters && (
-                          <button
-                            onClick={clearFilters}
-                            className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-                          >
-                            Clear filters to see all leads
-                          </button>
+                {/* Expanded Row */}
+                {isExpanded && (
+                  <div className="px-6 pb-5 bg-slate-900/30 border-t border-slate-700/30">
+                    <div className="grid grid-cols-2 gap-6 pt-4">
+                      {/* Lead Details */}
+                      <div className="space-y-2">
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contact Info</h3>
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex gap-2"><span className="text-slate-500 w-14">Phone</span><span className="text-slate-300">{lead.phone}</span></div>
+                          <div className="flex gap-2"><span className="text-slate-500 w-14">Email</span><span className="text-slate-300">{lead.email}</span></div>
+                          <div className="flex gap-2"><span className="text-slate-500 w-14">Age</span><span className="text-slate-300">{lead.age}</span></div>
+                          <div className="flex gap-2"><span className="text-slate-500 w-14">State</span><span className="text-slate-300">{lead.state}</span></div>
+                        </div>
+                        {lead.notes && (
+                          <div className="mt-3 p-3 rounded-lg bg-slate-800 border border-slate-700/50">
+                            <p className="text-xs text-slate-400 leading-relaxed">{lead.notes}</p>
+                          </div>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ) : (
-                  leads.map((lead: any) => {
-                    const scoreVal = lead.score ?? 0;
-                    const scoreColor =
-                      scoreVal >= 80
-                        ? "bg-emerald-500"
-                        : scoreVal >= 60
-                        ? "bg-amber-500"
-                        : "bg-red-500";
 
-                    return (
-                      <tr
-                        key={lead.id}
-                        className="border-b border-slate-800/50 hover:bg-slate-900/60 transition-colors"
-                      >
-                        {/* Name + contact */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`h-9 w-9 rounded-full ${getAvatarColor(
-                                lead.id
-                              )} flex items-center justify-center text-white text-xs font-semibold shrink-0`}
-                            >
-                              {getInitials(lead.firstName, lead.lastName)}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-white font-medium leading-tight truncate">
-                                {lead.firstName} {lead.lastName}
-                              </p>
-                              <p className="text-slate-500 text-xs mt-0.5 truncate">
-                                {lead.email ?? lead.phone ?? "—"}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Source */}
-                        <td className="px-4 py-3.5 text-slate-400 text-xs whitespace-nowrap">
-                          {lead.source?.replace(/_/g, " ") ?? "—"}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3.5">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${
-                              statusStyles[lead.status] ??
-                              "bg-slate-700 text-slate-300 border-slate-600"
-                            }`}
+                      {/* Action Buttons */}
+                      <div>
+                        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Actions</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openAction(lead, "call"); }}
+                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600/30 transition-all text-sm"
                           >
-                            <StatusDot status={lead.status} />
-                            {lead.status?.replace(/_/g, " ") ?? "—"}
-                          </span>
-                        </td>
-
-                        {/* Vertical */}
-                        <td className="px-4 py-3.5">
-                          {lead.vertical ? (
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                verticalColors[lead.vertical] ??
-                                "bg-slate-700 text-slate-300"
-                              }`}
-                            >
-                              {lead.vertical}
-                            </span>
-                          ) : (
-                            <span className="text-slate-600 text-xs">—</span>
-                          )}
-                        </td>
-
-                        {/* Score */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden shrink-0">
-                              <div
-                                className={`h-full rounded-full transition-all ${scoreColor}`}
-                                style={{ width: `${scoreVal}%` }}
-                              />
-                            </div>
-                            <span className="text-slate-400 text-xs font-mono w-6 text-right">
-                              {scoreVal}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Created */}
-                        <td className="px-4 py-3.5 text-slate-500 text-xs whitespace-nowrap">
-                          {lead.createdAt
-                            ? new Date(lead.createdAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "2-digit",
-                                }
-                              )
-                            : "—"}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => {
-                                setSelectedLead(lead);
-                                setShowDetail(true);
-                              }}
-                              className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
-                              title="View details"
-                            >
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    `Delete ${lead.firstName} ${lead.lastName}? This cannot be undone.`
-                                  )
-                                ) {
-                                  deleteMutation.mutate(lead.id);
-                                }
-                              }}
-                              disabled={deleteMutation.isPending}
-                              className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              title="Delete lead"
-                            >
-                              <svg
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Pagination ─────────────────────────────────────────── */}
-          {!isLoading && !isError && totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800">
-              <p className="text-xs text-slate-500">
-                Page {page} of {totalPages} &middot;{" "}
-                {total.toLocaleString()} total
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-
-                {paginationPages.map((pg) => (
-                  <button
-                    key={pg}
-                    onClick={() => setPage(pg)}
-                    className={`w-8 h-8 text-xs rounded-md transition-colors ${
-                      pg === page
-                        ? "bg-violet-600 text-white"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800"
-                    }`}
-                  >
-                    {pg}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-        </Card>
-      </main>
-
-      {/* ── Detail Drawer ─────────────────────────────────────────── */}
-      {showDetail && selectedLead && (
-        <div className="fixed inset-0 z-50 flex">
-          {/* Backdrop */}
-          <div
-            className="flex-1 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowDetail(false)}
-          />
-
-          {/* Panel */}
-          <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 flex flex-col overflow-hidden">
-            {/* Panel header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
-              <h2 className="text-base font-semibold text-white">
-                Lead Details
-              </h2>
-              <button
-                onClick={() => setShowDetail(false)}
-                className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Panel body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* Avatar + name */}
-              <div className="flex items-center gap-4">
-                <div
-                  className={`h-14 w-14 rounded-full ${getAvatarColor(
-                    selectedLead.id
-                  )} flex items-center justify-center text-white font-bold text-xl shrink-0`}
-                >
-                  {getInitials(
-                    selectedLead.firstName,
-                    selectedLead.lastName
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-white font-semibold text-lg leading-tight">
-                    {selectedLead.firstName} {selectedLead.lastName}
-                  </h3>
-                  {selectedLead.company && (
-                    <p className="text-slate-400 text-sm mt-0.5">
-                      {selectedLead.company}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        statusStyles[selectedLead.status] ??
-                        "bg-slate-700 text-slate-300 border-slate-600"
-                      }`}
-                    >
-                      <StatusDot status={selectedLead.status} />
-                      {selectedLead.status?.replace(/_/g, " ") ?? "—"}
-                    </span>
-                    {selectedLead.vertical && (
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          verticalColors[selectedLead.vertical] ??
-                          "bg-slate-700 text-slate-300"
-                        }`}
-                      >
-                        {selectedLead.vertical}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Score bar */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider">
-                    Lead Score
-                  </span>
-                  <span
-                    className={`text-sm font-semibold font-mono ${
-                      (selectedLead.score ?? 0) >= 80
-                        ? "text-emerald-400"
-                        : (selectedLead.score ?? 0) >= 60
-                        ? "text-amber-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    {selectedLead.score ?? 0} / 100
-                  </span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      (selectedLead.score ?? 0) >= 80
-                        ? "bg-emerald-500"
-                        : (selectedLead.score ?? 0) >= 60
-                        ? "bg-amber-500"
-                        : "bg-red-500"
-                    }`}
-                    style={{ width: `${selectedLead.score ?? 0}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Contact info */}
-              <div>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                  Contact Information
-                </h4>
-                <div className="space-y-2.5">
-                  {[
-                    {
-                      label: "Email",
-                      value: selectedLead.email,
-                      icon: (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                      ),
-                    },
-                    {
-                      label: "Phone",
-                      value: selectedLead.phone,
-                      icon: (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                      ),
-                    },
-                  ].map(({ label, value, icon }) =>
-                    value ? (
-                      <div key={label} className="flex items-center gap-3">
-                        <span className="text-slate-600 shrink-0">{icon}</span>
-                        <div>
-                          <p className="text-xs text-slate-500">{label}</p>
-                          <p className="text-slate-200 text-sm">{value}</p>
+                            <Phone size={15} /> Call Now
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openAction(lead, "sms"); }}
+                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/20 hover:bg-blue-600/30 transition-all text-sm"
+                          >
+                            <MessageSquare size={15} /> Send SMS
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openAction(lead, "email"); }}
+                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600/20 text-violet-400 border border-violet-500/20 hover:bg-violet-600/30 transition-all text-sm"
+                          >
+                            <Mail size={15} /> Send Email
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openAction(lead, "book"); }}
+                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-600/20 text-amber-400 border border-amber-500/20 hover:bg-amber-600/30 transition-all text-sm"
+                          >
+                            <CalendarClock size={15} /> Book Appt
+                          </button>
                         </div>
                       </div>
-                    ) : null
-                  )}
-                </div>
-              </div>
-
-              {/* Lead details */}
-              <div>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                  Lead Details
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    {
-                      label: "Source",
-                      value: selectedLead.source?.replace(/_/g, " "),
-                    },
-                    { label: "Vertical", value: selectedLead.vertical },
-                    {
-                      label: "Created",
-                      value: selectedLead.createdAt
-                        ? new Date(selectedLead.createdAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
-                          )
-                        : null,
-                    },
-                    {
-                      label: "Updated",
-                      value: selectedLead.updatedAt
-                        ? new Date(selectedLead.updatedAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
-                          )
-                        : null,
-                    },
-                  ].map(({ label, value }) =>
-                    value ? (
-                      <div
-                        key={label}
-                        className="rounded-lg bg-slate-800/60 px-3 py-2.5"
-                      >
-                        <p className="text-xs text-slate-500">{label}</p>
-                        <p className="text-slate-200 text-sm font-medium mt-0.5">
-                          {value}
-                        </p>
-                      </div>
-                    ) : null
-                  )}
-                </div>
-              </div>
-
-              {/* Notes */}
-              {selectedLead.notes && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Notes
-                  </h4>
-                  <div className="rounded-lg bg-slate-800/40 border border-slate-800 px-4 py-3">
-                    <p className="text-slate-300 text-sm leading-relaxed">
-                      {selectedLead.notes}
-                    </p>
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Quick status update */}
-              <div>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                  Update Status
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {QUICK_STATUSES.map((s) => {
-                    const isActive = selectedLead.status === s;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => {
-                          if (!isActive) {
-                            updateMutation.mutate(
-                              { id: selectedLead.id, status: s },
-                              {
-                                onSuccess: () => {
-                                  setSelectedLead((prev: any) =>
-                                    prev ? { ...prev, status: s } : prev
-                                  );
-                                },
-                              }
-                            );
-                          }
-                        }}
-                        disabled={updateMutation.isPending || isActive}
-                        className={`px-3 py-2 text-xs rounded-lg border transition-colors disabled:cursor-not-allowed ${
-                          isActive
-                            ? "bg-violet-600 border-violet-500 text-white opacity-100"
-                            : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600 hover:text-white disabled:opacity-40"
-                        }`}
-                      >
-                        {updateMutation.isPending && !isActive ? (
-                          <span className="flex items-center justify-center gap-1">
-                            <svg
-                              className="w-3 h-3 animate-spin"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              />
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                              />
-                            </svg>
-                            {s.replace(/_/g, " ")}
-                          </span>
-                        ) : (
-                          s.replace(/_/g, " ")
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                )}
               </div>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Danger zone */}
-              <div className="pt-2 border-t border-slate-800">
-                <button
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `Permanently delete ${selectedLead.firstName} ${selectedLead.lastName}? This cannot be undone.`
-                      )
-                    ) {
-                      deleteMutation.mutate(selectedLead.id, {
-                        onSuccess: () => setShowDetail(false),
-                      });
-                    }
-                  }}
-                  disabled={deleteMutation.isPending}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {deleteMutation.isPending ? (
-                    <svg
-                      className="w-4 h-4 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  )}
-                  Delete Lead
-                </button>
-              </div>
+      {/* ── Call Modal ───────────────────────────────────────────────────────── */}
+      <Modal open={callOpen} onClose={() => setCallOpen(false)} title="Initiate Call">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-800 border border-slate-700/50">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
+              <Phone size={22} className="text-emerald-400" />
+            </div>
+            <div>
+              <div className="text-white font-medium">{activeLead?.name}</div>
+              <div className="text-slate-400 text-sm">{activeLead?.phone}</div>
+              <div className="text-slate-500 text-xs mt-0.5">{activeLead?.vertical} · Score: {activeLead?.score}</div>
             </div>
           </div>
+          {activeLead?.notes && (
+            <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <div className="text-xs text-slate-500 mb-1">Lead Notes</div>
+              <p className="text-sm text-slate-300">{activeLead.notes}</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setCallOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleCall} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-all">
+              <Phone size={15} /> Call Now
+            </button>
+          </div>
         </div>
-      )}
+      </Modal>
+
+      {/* ── SMS Modal ────────────────────────────────────────────────────────── */}
+      <Modal open={smsOpen} onClose={() => setSmsOpen(false)} title="Send SMS">
+        <div className="space-y-4">
+          <div className="text-sm text-slate-400">
+            To: <span className="text-white">{activeLead?.name}</span> · <span className="text-slate-300">{activeLead?.phone}</span>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Message <span className="text-red-400">*</span></label>
+            <textarea
+              value={smsText}
+              onChange={(e) => setSmsText(e.target.value)}
+              rows={4}
+              maxLength={160}
+              placeholder="Type your SMS message…"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+            />
+            <div className="text-right text-xs text-slate-500 mt-1">{smsText.length}/160</div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setSmsOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleSMS} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-all">
+              <MessageSquare size={15} /> Send SMS
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Email Modal ──────────────────────────────────────────────────────── */}
+      <Modal open={emailOpen} onClose={() => setEmailOpen(false)} title="Send Email" width="max-w-xl">
+        <div className="space-y-4">
+          <div className="text-sm text-slate-400">
+            To: <span className="text-white">{activeLead?.name}</span> · <span className="text-slate-300">{activeLead?.email}</span>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Subject <span className="text-red-400">*</span></label>
+            <input
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              placeholder="e.g. Your Medicare Advantage Options for 2025"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Body <span className="text-red-400">*</span></label>
+            <textarea
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              rows={6}
+              placeholder="Type your email message…"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setEmailOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleEmail} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+              <Mail size={15} /> Send Email
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Book Appointment Modal ───────────────────────────────────────────── */}
+      <Modal open={bookOpen} onClose={() => setBookOpen(false)} title="Book Appointment">
+        <div className="space-y-4">
+          <div className="text-sm text-slate-400">
+            With: <span className="text-white">{activeLead?.name}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Date <span className="text-red-400">*</span></label>
+              <input
+                type="date"
+                value={apptDate}
+                onChange={(e) => setApptDate(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Time <span className="text-red-400">*</span></label>
+              <input
+                type="time"
+                value={apptTime}
+                onChange={(e) => setApptTime(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setBookOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleBook} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium transition-all">
+              <CalendarClock size={15} /> Confirm Booking
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

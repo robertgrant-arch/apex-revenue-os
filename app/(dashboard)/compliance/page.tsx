@@ -1,561 +1,397 @@
 "use client";
-
 import { useState } from "react";
 import {
-  RadialBarChart,
-  RadialBar,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
-import {
-  Shield,
-  Lock,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  XCircle,
-  Heart,
-  Scale,
-  Home,
-  Car,
-  DollarSign,
-  Globe,
-  ChevronDown,
-  Plus,
-  Download,
-  Activity,
+  Shield, Plus, ChevronDown, ChevronRight, CheckCircle,
+  XCircle, AlertTriangle, Clock, FileText, Lock, Zap
 } from "lucide-react";
-import { TopBar } from "@/components/layout/TopBar";
-import { MetricCard } from "@/components/ui/MetricCard";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { ChartTooltip } from "@/components/ui/ChartTooltip";
-import { complianceRules, approvalQueue } from "@/lib/data";
+import Modal from "@/components/ui/Modal";
+import { Toast, useToast } from "@/components/ui/Toast";
 
-const VERTICAL_SCORES = [
-  { v: "Medicare",      score: 97, color: "#3b82f6",  Icon: Heart,      fill: "#3b82f6" },
-  { v: "Insurance",     score: 94, color: "#f59e0b",  Icon: Shield,     fill: "#f59e0b" },
-  { v: "Legal",         score: 99, color: "#8b5cf6",  Icon: Scale,      fill: "#8b5cf6" },
-  { v: "Home Services", score: 91, color: "#10b981",  Icon: Home,       fill: "#10b981" },
-  { v: "Auto",          score: 73, color: "#ef4444",  Icon: Car,        fill: "#ef4444" },
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface ApprovalItem {
+  id: string;
+  title: string;
+  type: "ad" | "email" | "sms" | "script" | "landing_page";
+  submittedBy: string;
+  submittedAt: string;
+  status: "pending" | "approved" | "rejected";
+  content: string;
+  rejectionReason?: string;
+}
+
+interface ComplianceRule {
+  id: string;
+  name: string;
+  category: string;
+  severity: "critical" | "high" | "medium" | "low";
+  active: boolean;
+  description: string;
+  details: string;
+  lastTriggered?: string;
+  triggerCount: number;
+}
+
+// ── Mock Data ──────────────────────────────────────────────────────────────────
+const INITIAL_APPROVALS: ApprovalItem[] = [
+  { id: "ap1", title: "Medicare Advantage Q3 Facebook Ad", type: "ad", submittedBy: "CampaignOptimizer", submittedAt: "2025-07-14 09:12", status: "pending", content: "Get the Medicare Advantage plan that's right for you. Compare plans in your area today. Benefits may vary by location. Not all plans available in all areas." },
+  { id: "ap2", title: "Final Expense Email — Sequence 3", type: "email", submittedBy: "ContentCreator", submittedAt: "2025-07-14 08:45", status: "pending", content: "Subject: Your family deserves peace of mind\n\nDear [First Name], protecting your loved ones doesn't have to be expensive. Our final expense plans start at just $X/month..." },
+  { id: "ap3", title: "ACA Landing Page — Hero Copy", type: "landing_page", submittedBy: "ContentCreator", submittedAt: "2025-07-13 16:30", status: "pending", content: "Find affordable health insurance coverage for 2025. Get a free quote in minutes. No commitment required." },
+  { id: "ap4", title: "Medicare SMS Campaign", type: "sms", submittedBy: "CampaignOptimizer", submittedAt: "2025-07-13 14:00", status: "approved", content: "Hi [Name], your Medicare options for 2025 are waiting. Reply STOP to opt out." },
+  { id: "ap5", title: "Agent Script — Medicare Advantage Intro", type: "script", submittedBy: "ContentCreator", submittedAt: "2025-07-12 11:20", status: "rejected", content: "Hi, I'm calling about guaranteed Medicare Advantage coverage available in your area...", rejectionReason: "Contains prohibited 'guaranteed' language per CMS guidelines §40.3" },
 ];
 
-const TIER_INFO = [
-  {
-    tier: 1,
-    label: "Critical",
-    color: "#ef4444",
-    bg: "bg-red-500/10",
-    border: "border-red-500/30",
-    textColor: "text-red-400",
-    desc: "Federal regulations (TCPA, HIPAA, FTC). Violations carry fines up to $1,500 per incident. Human review required before any launch. Zero-tolerance policy.",
-  },
-  {
-    tier: 2,
-    label: "Important",
-    color: "#f59e0b",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/30",
-    textColor: "text-amber-400",
-    desc: "State regulations and platform policies. Auto-review with human override capability. 24-hour SLA for approval. Escalated to Tier 1 if unresolved.",
-  },
-  {
-    tier: 3,
-    label: "Standard",
-    color: "#10b981",
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/30",
-    textColor: "text-emerald-400",
-    desc: "Brand guidelines and internal policies. Automated review only. Instant approval for compliant assets. Flagged for human review only on repeated failures.",
-  },
+const INITIAL_RULES: ComplianceRule[] = [
+  { id: "r1", name: "CMS Prohibited Language Filter", category: "Medicare", severity: "critical", active: true, description: "Blocks ads and scripts containing CMS-prohibited terms", details: "Scans all outbound content for terms prohibited by CMS, including 'guaranteed', 'best', 'unlimited benefits', and other superlatives. Applies to Medicare Advantage and Part D communications.", lastTriggered: "2025-07-14", triggerCount: 147 },
+  { id: "r2", name: "TCPA Consent Verification", category: "Contact", severity: "critical", active: true, description: "Validates opt-in consent before allowing SMS/call campaigns", details: "Cross-references all phone contacts against consent database. Blocks outreach to numbers without valid TCPA written consent. Auto-removes numbers after consent expiry (18 months).", lastTriggered: "2025-07-14", triggerCount: 892 },
+  { id: "r3", name: "DNC Registry Scrub", category: "Contact", severity: "high", active: true, description: "Scrubs lists against Federal and State DNC registries", details: "Daily automated scrub against the National Do Not Call Registry and 13 state-specific DNC lists. Lists are re-scrubbed every 31 days per FTC requirements.", lastTriggered: "2025-07-14", triggerCount: 3401 },
+  { id: "r4", name: "Disclaimer Presence Check", category: "Advertising", severity: "high", active: true, description: "Ensures all ads include required legal disclaimers", details: "Verifies presence of required disclosures: plan availability notice, licensed agent disclosure, CMS required language for Medicare. Blocks publication if any disclaimer is missing.", lastTriggered: "2025-07-13", triggerCount: 24 },
+  { id: "r5", name: "State Licensing Verification", category: "Operations", severity: "medium", active: true, description: "Validates agent licensing before lead assignment", details: "Checks agent license status in target state before routing leads. Integrates with NIPR database for real-time verification. Alerts compliance team if license is expired or pending.", lastTriggered: "2025-07-12", triggerCount: 8 },
+  { id: "r6", name: "SOC 2 Data Handling", category: "Privacy", severity: "medium", active: false, description: "Enforces data retention and access control policies", details: "Monitors PII access patterns, enforces data retention schedules (7 years for insurance records), and alerts on anomalous access. Paused for infrastructure migration.", triggerCount: 0 },
 ];
 
-const radialData = VERTICAL_SCORES.map((v) => ({
-  name: v.v,
-  value: v.score,
-  fill: v.fill,
-}));
+const severityConfig = {
+  critical: { color: "red", label: "Critical" },
+  high: { color: "amber", label: "High" },
+  medium: { color: "blue", label: "Medium" },
+  low: { color: "slate", label: "Low" },
+};
 
+const typeIcon = (type: ApprovalItem["type"]) => {
+  if (type === "ad") return <Zap size={14} />;
+  if (type === "email" || type === "sms") return <FileText size={14} />;
+  if (type === "script") return <Lock size={14} />;
+  return <FileText size={14} />;
+};
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 export default function CompliancePage() {
-  const [activeTab, setActiveTab] = useState<"rules" | "queue" | "tiers">(
-    "rules"
-  );
-  const [expandedRule, setExpandedRule] = useState<number | null>(null);
-  const [queueFilter, setQueueFilter] = useState<string>("all");
+  const { toasts, addToast, removeToast } = useToast();
+  const [approvals, setApprovals] = useState<ApprovalItem[]>(INITIAL_APPROVALS);
+  const [rules, setRules] = useState<ComplianceRule[]>(INITIAL_RULES);
+  const [expandedRule, setExpandedRule] = useState<string | null>(null);
 
-  const queueStatuses = ["all", "pending", "approved", "flagged", "rejected"];
-  const filteredQueue =
-    queueFilter === "all"
-      ? approvalQueue
-      : approvalQueue.filter((i) => i.status === queueFilter);
+  // Modals
+  const [addRuleOpen, setAddRuleOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<ApprovalItem | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
-  const overallScore = Math.round(
-    VERTICAL_SCORES.reduce((a, b) => a + b.score, 0) / VERTICAL_SCORES.length
-  );
+  // Add Rule form
+  const emptyRule = { name: "", category: "Medicare", severity: "high", description: "", details: "" };
+  const [ruleForm, setRuleForm] = useState(emptyRule);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleApprove = (id: string) => {
+    setApprovals((prev) => prev.map((a) => a.id === id ? { ...a, status: "approved" } : a));
+    const item = approvals.find((a) => a.id === id);
+    addToast(`"${item?.title}" approved`, "success");
+  };
+
+  const openReject = (item: ApprovalItem) => {
+    setRejectTarget(item);
+    setRejectReason("");
+    setRejectOpen(true);
+  };
+
+  const handleReject = () => {
+    if (!rejectReason.trim()) { addToast("Rejection reason is required", "error"); return; }
+    if (!rejectTarget) return;
+    setApprovals((prev) =>
+      prev.map((a) => a.id === rejectTarget.id ? { ...a, status: "rejected", rejectionReason: rejectReason } : a)
+    );
+    setRejectOpen(false);
+    setRejectReason("");
+    addToast(`"${rejectTarget.title}" rejected`, "info");
+  };
+
+  const handleAddRule = () => {
+    if (!ruleForm.name.trim()) { addToast("Rule name is required", "error"); return; }
+    if (!ruleForm.description.trim()) { addToast("Description is required", "error"); return; }
+    const nr: ComplianceRule = {
+      id: `r${Date.now()}`,
+      name: ruleForm.name,
+      category: ruleForm.category,
+      severity: ruleForm.severity as ComplianceRule["severity"],
+      active: true,
+      description: ruleForm.description,
+      details: ruleForm.details,
+      triggerCount: 0,
+    };
+    setRules((prev) => [nr, ...prev]);
+    setAddRuleOpen(false);
+    setRuleForm(emptyRule);
+    addToast(`Rule "${nr.name}" added`, "success");
+  };
+
+  const toggleRule = (id: string) => {
+    setRules((prev) => prev.map((r) => {
+      if (r.id !== id) return r;
+      const next = !r.active;
+      addToast(`Rule "${r.name}" ${next ? "enabled" : "disabled"}`, next ? "success" : "info");
+      return { ...r, active: next };
+    }));
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  const pending = approvals.filter((a) => a.status === "pending");
+  const approved = approvals.filter((a) => a.status === "approved").length;
+  const rejected = approvals.filter((a) => a.status === "rejected").length;
+  const activeRules = rules.filter((r) => r.active).length;
 
   return (
-    <>
-      <TopBar
-        title="Compliance Engine"
-        subtitle="TCPA · HIPAA · FTC · CAN-SPAM · State regulations"
-      />
-      <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6">
+      <Toast toasts={toasts} removeToast={removeToast} />
 
-        {/* ── KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Overall Score"
-            value={`${overallScore}/100`}
-            sub="+2 pts this week"
-            trend="up"
-            icon={Shield}
-            color="#10b981"
-          />
-          <MetricCard
-            label="Active Rules"
-            value="42"
-            sub="Across 5 verticals"
-            icon={Lock}
-            color="#6366f1"
-          />
-          <MetricCard
-            label="Pending Approvals"
-            value={String(approvalQueue.filter((i) => i.status === "pending").length)}
-            sub={`${approvalQueue.filter((i) => i.status === "flagged").length} flagged`}
-            trend="down"
-            icon={Clock}
-            color="#f59e0b"
-          />
-          <MetricCard
-            label="Assets Reviewed"
-            value="602"
-            sub="This month"
-            icon={CheckCircle2}
-            color="#3b82f6"
-          />
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Compliance Center</h1>
+          <p className="text-slate-400 text-sm mt-1">Review queue, rule management, and audit trail</p>
         </div>
+        <button
+          onClick={() => setAddRuleOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-all text-sm font-medium"
+        >
+          <Plus size={16} /> Add Rule
+        </button>
+      </div>
 
-        {/* ── Scores overview ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "Pending Review", value: pending.length, color: "amber", icon: <Clock size={18} /> },
+          { label: "Approved", value: approved, color: "emerald", icon: <CheckCircle size={18} /> },
+          { label: "Rejected", value: rejected, color: "red", icon: <XCircle size={18} /> },
+          { label: "Active Rules", value: activeRules, color: "violet", icon: <Shield size={18} /> },
+        ].map((s) => (
+          <div key={s.label} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+            <div className={`w-9 h-9 rounded-lg bg-${s.color}-500/10 flex items-center justify-center text-${s.color}-400 mb-3`}>
+              {s.icon}
+            </div>
+            <div className="text-2xl font-bold text-white">{s.value}</div>
+            <div className="text-slate-400 text-xs mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
 
-          {/* Radial chart */}
-          <Card className="p-4 flex flex-col items-center">
-            <h3 className="text-sm font-semibold text-white mb-2 self-start">
-              Overall Compliance
-            </h3>
-            <div className="relative w-full">
-              <ResponsiveContainer width="100%" height={200}>
-                <RadialBarChart
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="30%"
-                  outerRadius="90%"
-                  data={radialData}
-                  startAngle={180}
-                  endAngle={0}
-                >
-                  <RadialBar
-                    background={{ fill: "#1e293b" }}
-                    dataKey="value"
-                    cornerRadius={4}
-                  />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload;
-                      return (
-                        <div className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs">
-                          <div className="font-medium text-white">{d.name}</div>
-                          <div style={{ color: d.fill }}>{d.value}%</div>
-                        </div>
-                      );
-                    }}
-                  />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center mt-8">
-                  <div className="text-3xl font-bold text-white">{overallScore}%</div>
-                  <div className="text-xs text-slate-500">Avg score</div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 w-full mt-1">
-              {VERTICAL_SCORES.map(({ v, score, color }) => (
-                <div key={v} className="text-center">
-                  <div className="text-xs font-bold" style={{ color }}>
-                    {score}%
-                  </div>
-                  <div className="text-[10px] text-slate-500 truncate">{v}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Per-vertical score bars */}
-          <Card className="lg:col-span-2 p-4">
-            <h3 className="text-sm font-semibold text-white mb-4">
-              Score by Vertical
-            </h3>
-            <div className="space-y-4">
-              {VERTICAL_SCORES.map(({ v, score, color, Icon }) => (
-                <div key={v}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: color + "20" }}
-                      >
-                        <Icon size={13} style={{ color }} />
-                      </div>
-                      <span className="text-sm text-white font-medium">{v}</span>
-                      {score < 80 && (
-                        <Badge color="red">Needs attention</Badge>
-                      )}
-                      {score >= 99 && (
-                        <Badge color="emerald">Perfect</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="text-base font-bold"
-                        style={{ color }}
-                      >
-                        {score}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-slate-700 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{ width: `${score}%`, background: color }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+      {/* Approval Queue */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50">
+          <h2 className="text-sm font-semibold text-white">Approval Queue</h2>
         </div>
-
-        {/* ── Tab navigation ── */}
-        <div className="flex gap-1.5">
-          {(["rules", "queue", "tiers"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={`text-xs px-4 py-2 rounded-lg font-medium capitalize transition-colors ${
-                activeTab === t
-                  ? "bg-emerald-500 text-white"
-                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-white"
-              }`}
-            >
-              {t === "rules"  ? `Compliance Rules (${complianceRules.length})` :
-               t === "queue"  ? `Approval Queue (${approvalQueue.length})` :
-               "Tier Guide"}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Rules tab ── */}
-        {activeTab === "rules" && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                Active Compliance Rules
-              </h3>
-              <div className="flex gap-2">
-                <button className="flex items-center gap-1.5 text-xs border border-slate-700 text-slate-400 px-3 py-1.5 rounded-lg hover:border-slate-500 transition-colors">
-                  <Download size={12} />Export
-                </button>
-                <button className="flex items-center gap-1.5 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
-                  <Plus size={12} />Add Rule
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {complianceRules.map((r) => {
-                const isExpanded = expandedRule === r.id;
-                return (
-                  <div
-                    key={r.id}
-                    className="border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
-                  >
-                    <div
-                      className="flex items-center gap-3 p-3.5 cursor-pointer"
-                      onClick={() => setExpandedRule(isExpanded ? null : r.id)}
-                    >
-                      {/* Vertical icon */}
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          r.vertical === "Medicare"         ? "bg-blue-500/20"   :
-                          r.vertical === "Insurance"        ? "bg-amber-500/20"  :
-                          r.vertical === "Legal"            ? "bg-purple-500/20" :
-                          r.vertical === "Home Services"    ? "bg-emerald-500/20":
-                          r.vertical === "Auto"             ? "bg-amber-500/20"  : "bg-slate-700"
-                        }`}
-                      >
-                        {r.vertical === "Medicare"      ? <Heart  size={14} className="text-blue-400"    /> :
-                         r.vertical === "Legal"         ? <Scale  size={14} className="text-purple-400"  /> :
-                         r.vertical === "Home Services" ? <Home   size={14} className="text-emerald-400" /> :
-                         r.vertical === "Auto"          ? <Car    size={14} className="text-amber-400"   /> :
-                         r.vertical === "Insurance"     ? <Shield size={14} className="text-amber-400"   /> :
-                         <Globe size={14} className="text-slate-400" />}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-white">
-                            {r.name}
-                          </span>
-                          <Badge
-                            color={
-                              r.vertical === "Medicare"   ? "blue"   :
-                              r.vertical === "Legal"      ? "purple" :
-                              r.vertical === "All"        ? "slate"  : "amber"
-                            }
-                          >
-                            {r.vertical}
-                          </Badge>
-                          <span className="text-xs text-slate-500">
-                            Tier {r.tier} · {r.assets} assets
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right">
-                          <div
-                            className={`text-sm font-bold ${
-                              r.score >= 95 ? "text-emerald-400" :
-                              r.score >= 85 ? "text-amber-400"   : "text-red-400"
-                            }`}
-                          >
-                            {r.score}%
-                          </div>
-                          <div
-                            className={`flex items-center gap-1 text-xs ${
-                              r.status === "active" ? "text-emerald-400" : "text-amber-400"
-                            }`}
-                          >
-                            {r.status === "active"
-                              ? <CheckCircle2 size={10} />
-                              : <AlertTriangle size={10} />}
-                            {r.status}
-                          </div>
-                        </div>
-                        {isExpanded
-                          ? <ChevronDown size={14} className="text-slate-500 rotate-180" />
-                          : <ChevronDown size={14} className="text-slate-500" />}
-                      </div>
+        <div className="divide-y divide-slate-700/30">
+          {approvals.map((item) => (
+            <div key={item.id} className="px-6 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    item.status === "approved" ? "bg-emerald-500/10 text-emerald-400" :
+                    item.status === "rejected" ? "bg-red-500/10 text-red-400" :
+                    "bg-amber-500/10 text-amber-400"
+                  }`}>
+                    {typeIcon(item.type)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-white">{item.title}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      Submitted by {item.submittedBy} · {item.submittedAt}
                     </div>
-
-                    {isExpanded && (
-                      <div className="px-4 pb-4 border-t border-slate-800 bg-slate-900/30">
-                        <p className="text-xs text-slate-400 leading-relaxed mt-3 mb-3">
-                          {r.description}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <button className="text-xs border border-slate-700 text-slate-400 px-3 py-1.5 rounded-lg hover:border-slate-500 transition-colors">
-                            View {r.assets} Assets
-                          </button>
-                          <button className="text-xs border border-slate-700 text-slate-400 px-3 py-1.5 rounded-lg hover:border-slate-500 transition-colors">
-                            Edit Rule
-                          </button>
-                          {r.status === "warning" && (
-                            <button className="text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 py-1.5 rounded-lg hover:bg-amber-500/20 transition-colors">
-                              Resolve Warning →
-                            </button>
-                          )}
-                        </div>
+                    <div className="mt-2 p-2.5 rounded-lg bg-slate-900/50 border border-slate-700/30">
+                      <p className="text-xs text-slate-400 font-mono leading-relaxed line-clamp-2">{item.content}</p>
+                    </div>
+                    {item.status === "rejected" && item.rejectionReason && (
+                      <div className="mt-2 flex items-start gap-1.5">
+                        <AlertTriangle size={12} className="text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-400">{item.rejectionReason}</p>
                       </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
-
-        {/* ── Queue tab ── */}
-        {activeTab === "queue" && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">
-                Approval Queue
-              </h3>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Activity size={11} className="text-emerald-400 animate-pulse" />
-                  Live
                 </div>
-                <div className="flex gap-1">
-                  {queueStatuses.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setQueueFilter(s)}
-                      className={`text-xs px-2.5 py-1 rounded-lg capitalize transition-colors ${
-                        queueFilter === s
-                          ? "bg-emerald-500 text-white"
-                          : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-white"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {item.status === "pending" ? (
+                    <>
+                      <button
+                        onClick={() => handleApprove(item.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600/30 text-xs transition-all"
+                      >
+                        <CheckCircle size={13} /> Approve
+                      </button>
+                      <button
+                        onClick={() => openReject(item)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-500/20 hover:bg-red-600/30 text-xs transition-all"
+                      >
+                        <XCircle size={13} /> Reject
+                      </button>
+                    </>
+                  ) : (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${
+                      item.status === "approved"
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        : "bg-red-500/10 text-red-400 border-red-500/20"
+                    } capitalize`}>
+                      {item.status}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-
-            <div className="space-y-3">
-              {filteredQueue.map((item) => (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-xl border transition-colors ${
-                    item.status === "flagged"
-                      ? "bg-red-500/5 border-red-500/20"
-                      : item.status === "approved"
-                      ? "bg-emerald-500/5 border-emerald-500/20"
-                      : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2 gap-2">
-                    <div>
-                      <div className="text-sm font-medium text-white">
-                        {item.asset}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        {item.type} · Tier {item.tier} · Submitted {item.submitted}{" "}
-                        by <span className="text-slate-400">{item.submittedBy}</span>
-                      </div>
-                    </div>
-                    <Badge
-                      color={
-                        item.status === "approved"  ? "emerald" :
-                        item.status === "flagged"   ? "red"     :
-                        item.status === "rejected"  ? "red"     : "amber"
-                      }
-                    >
-                      {item.status === "pending" && (
-                        <span className="mr-1 inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                      )}
-                      {item.status}
-                    </Badge>
-                  </div>
-
-                  {item.flags.length > 0 && (
-                    <div className="space-y-1 mb-3 p-2.5 bg-amber-500/5 border border-amber-500/20 rounded-lg">
-                      <div className="text-xs font-medium text-amber-400 mb-1">
-                        Compliance Flags ({item.flags.length})
-                      </div>
-                      {item.flags.map((f, i) => (
-                        <div
-                          key={i}
-                          className="flex items-start gap-1.5 text-xs text-amber-300"
-                        >
-                          <AlertCircle size={10} className="mt-0.5 shrink-0" />
-                          {f}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {item.status === "approved" && (
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-400 mb-2">
-                      <CheckCircle2 size={11} />
-                      Cleared for launch — all compliance checks passed
-                    </div>
-                  )}
-
-                  {item.status === "flagged" && (
-                    <div className="flex items-center gap-1.5 text-xs text-red-400 mb-2">
-                      <XCircle size={11} />
-                      Blocked — revisions required before re-submission
-                    </div>
-                  )}
-
-                  {item.status === "pending" && (
-                    <div className="flex gap-2 mt-1">
-                      <button className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5">
-                        <CheckCircle2 size={12} />Approve
-                      </button>
-                      <button className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5">
-                        <XCircle size={12} />Reject
-                      </button>
-                      <button className="px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-lg font-medium transition-colors">
-                        Review
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {filteredQueue.length === 0 && (
-                <div className="text-center text-slate-500 text-sm py-8">
-                  No items match this filter.
-                </div>
-              )}
-            </div>
-          </Card>
-        )}
-
-        {/* ── Tier guide tab ── */}
-        {activeTab === "tiers" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {TIER_INFO.map((t) => (
-              <Card key={t.tier} className="p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold border ${t.bg} ${t.border} ${t.textColor}`}
-                  >
-                    {t.tier}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-white">Tier {t.tier}</div>
-                    <div className={`text-xs font-medium ${t.textColor}`}>
-                      {t.label}
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                  {t.desc}
-                </p>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Review method</span>
-                    <span className="text-white font-medium">
-                      {t.tier === 1 ? "Human required" : t.tier === 2 ? "Auto + human override" : "Automated only"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Approval SLA</span>
-                    <span className="text-white font-medium">
-                      {t.tier === 1 ? "24–48 hours" : t.tier === 2 ? "24 hours" : "Instant"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Violation risk</span>
-                    <span className={`font-medium ${t.textColor}`}>
-                      {t.tier === 1 ? "Federal fine ($1,500+/incident)" : t.tier === 2 ? "Platform ban / state fine" : "Brand / internal policy"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Examples</span>
-                    <span className="text-slate-300 text-right max-w-[140px]">
-                      {t.tier === 1 ? "TCPA, HIPAA, FTC" : t.tier === 2 ? "State regs, Meta policy" : "Brand guidelines"}
-                    </span>
-                  </div>
-                </div>
-                <div className={`mt-4 p-2.5 rounded-lg border ${t.bg} ${t.border}`}>
-                  <div className="text-xs text-center font-medium" style={{ color: t.color }}>
-                    {complianceRules.filter((r) => r.tier === t.tier).length} active rules in this tier
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-
+          ))}
+        </div>
       </div>
-    </>
+
+      {/* Compliance Rules */}
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Compliance Rules</h2>
+          <span className="text-xs text-slate-500">{rules.length} rules · {activeRules} active</span>
+        </div>
+        <div className="divide-y divide-slate-700/30">
+          {rules.map((rule) => {
+            const sc = severityConfig[rule.severity];
+            const isExpanded = expandedRule === rule.id;
+            return (
+              <div key={rule.id}>
+                <div
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-slate-700/20 cursor-pointer transition-colors"
+                  onClick={() => setExpandedRule(isExpanded ? null : rule.id)}
+                >
+                  <div className="text-slate-500">
+                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white">{rule.name}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{rule.category} · {rule.description}</div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs border bg-${sc.color}-500/10 text-${sc.color}-400 border-${sc.color}-500/20`}>
+                    {sc.label}
+                  </span>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-400">{rule.triggerCount.toLocaleString()} triggers</div>
+                    {rule.lastTriggered && <div className="text-xs text-slate-600">{rule.lastTriggered}</div>}
+                  </div>
+                  {/* Toggle */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleRule(rule.id); }}
+                    className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${rule.active ? "bg-violet-600" : "bg-slate-700"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${rule.active ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="px-6 pb-4 bg-slate-900/30 border-t border-slate-700/30">
+                    <div className="pt-4 space-y-3">
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Rule Details</div>
+                        <p className="text-sm text-slate-300 leading-relaxed">{rule.details}</p>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                        <span>Category: <span className="text-slate-300">{rule.category}</span></span>
+                        <span>Severity: <span className={`text-${sc.color}-400`}>{sc.label}</span></span>
+                        <span>Status: <span className={rule.active ? "text-emerald-400" : "text-slate-400"}>{rule.active ? "Active" : "Disabled"}</span></span>
+                        {rule.lastTriggered && <span>Last triggered: <span className="text-slate-300">{rule.lastTriggered}</span></span>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Reject Modal ──────────────────────────────────────────────────────── */}
+      <Modal open={rejectOpen} onClose={() => setRejectOpen(false)} title="Reject Submission">
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-slate-800 border border-slate-700/50">
+            <div className="text-sm font-medium text-white">{rejectTarget?.title}</div>
+            <div className="text-xs text-slate-500 mt-0.5">Submitted by {rejectTarget?.submittedBy}</div>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Rejection Reason <span className="text-red-400">*</span></label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Contains prohibited 'guaranteed' language per CMS guidelines §40.3"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setRejectOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleReject} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-all">
+              <XCircle size={15} /> Confirm Rejection
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Add Rule Modal ─────────────────────────────────────────────────── */}
+      <Modal open={addRuleOpen} onClose={() => setAddRuleOpen(false)} title="Add Compliance Rule" width="max-w-xl">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Rule Name <span className="text-red-400">*</span></label>
+            <input
+              value={ruleForm.name}
+              onChange={(e) => setRuleForm((p) => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. State-Specific Disclosure Check"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Category</label>
+              <select
+                value={ruleForm.category}
+                onChange={(e) => setRuleForm((p) => ({ ...p, category: e.target.value }))}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
+              >
+                {["Medicare", "ACA", "Contact", "Advertising", "Privacy", "Operations", "Other"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Severity</label>
+              <select
+                value={ruleForm.severity}
+                onChange={(e) => setRuleForm((p) => ({ ...p, severity: e.target.value }))}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
+              >
+                {["critical", "high", "medium", "low"].map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Short Description <span className="text-red-400">*</span></label>
+            <input
+              value={ruleForm.description}
+              onChange={(e) => setRuleForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="One-line description of what this rule enforces"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1.5">Detailed Logic</label>
+            <textarea
+              value={ruleForm.details}
+              onChange={(e) => setRuleForm((p) => ({ ...p, details: e.target.value }))}
+              rows={3}
+              placeholder="Describe the rule's logic, triggers, and enforcement actions…"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => setAddRuleOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
+            <button onClick={handleAddRule} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
+              <Plus size={15} /> Add Rule
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }
