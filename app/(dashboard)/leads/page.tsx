@@ -179,9 +179,7 @@ const QUICK_STATUSES = [
 export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [debounceTimer, setDebounceTimer] = useState<ReturnType
-    typeof setTimeout
-  > | null>(null);
+    const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [verticalFilter, setVerticalFilter] = useState("ALL");
   const [page, setPage] = useState(1);
