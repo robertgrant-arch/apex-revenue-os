@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Search, Play, Pause, Zap, Brain, Palette, Radio, Megaphone, GitBranch, BarChart2, ChevronRight, Clock, CheckCircle2 } from "lucide-react";
+import { Search, Zap, Brain, Palette, Radio, Megaphone, GitBranch, BarChart2, ChevronRight, Clock, CheckCircle2 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/Toast";
