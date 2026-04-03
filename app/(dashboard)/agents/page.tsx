@@ -85,10 +85,7 @@ const statusConfig: Record<string, { badge: string; dot: string; label: string; 
   },
 };
 
-const typeConfig: Record
-  string,
-  { color: string; bg: string; icon: React.ReactNode }
-> = {
+  const typeConfig: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
   QUALIFIER: {
     color: "text-violet-400",
     bg: "bg-violet-500/20",
@@ -993,10 +990,7 @@ function CreateAgentModal({ onClose }: CreateAgentModalProps) {
 
 // ─── Audit log entry ──────────────────────────────────────────────────────────
 
-const auditActionConfig: Record
-  string,
-  { label: string; icon: React.ReactNode; color: string; bg: string }
-> = {
+  const auditActionConfig: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
   BATCH_PROCESSED: {
     label: "Batch Processed",
     color: "text-violet-400",
