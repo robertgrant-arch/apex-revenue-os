@@ -60,19 +60,6 @@ export default function DashboardPage() {
         <TopBar title="Dashboard" />
         <div className="flex flex-1 items-center justify-center">
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-8 text-center max-w-md">
-            <svg
-              className="w-10 h-10 text-red-400 mx-auto mb-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
             <p className="text-red-400 font-medium">Failed to load dashboard</p>
             <p className="text-slate-500 text-sm mt-1">
               {(error as Error)?.message ?? "An unexpected error occurred"}
@@ -116,9 +103,7 @@ export default function DashboardPage() {
     },
     {
       label: "Revenue (MTD)",
-      value: isLoading
-        ? "—"
-        : `$${((stats.revenueMtd ?? 0) / 1000).toFixed(1)}k`,
+      value: isLoading ? "—" : `$${((stats.revenueMtd ?? 0) / 1000).toFixed(1)}k`,
       change: stats.revenueChange ?? 0,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,9 +114,7 @@ export default function DashboardPage() {
     },
     {
       label: "Conversion Rate",
-      value: isLoading
-        ? "—"
-        : `${((stats.conversionRate ?? 0) * 100).toFixed(1)}%`,
+      value: isLoading ? "—" : `${((stats.conversionRate ?? 0) * 100).toFixed(1)}%`,
       change: stats.conversionChange ?? 0,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,7 +147,7 @@ export default function DashboardPage() {
     },
   ];
 
-    const statusColors = {
+  const statusColors: Record<string, string> = {
     NEW: "bg-slate-500/20 text-slate-300",
     CONTACTED: "bg-blue-500/20 text-blue-300",
     QUALIFIED: "bg-violet-500/20 text-violet-300",
@@ -178,7 +161,6 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-950">
       <TopBar title="Dashboard" />
-
       <main className="flex-1 p-6 space-y-6">
         {/* Metric Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -200,7 +182,6 @@ export default function DashboardPage() {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {/* Revenue Area Chart */}
           <div className="xl:col-span-2">
             <Card>
               <div className="p-5">
@@ -212,22 +193,15 @@ export default function DashboardPage() {
                     </>
                   ) : (
                     <>
-                      <h2 className="text-sm font-semibold text-white">
-                        Revenue Over Time
-                      </h2>
-                      <Badge variant="emerald" size="sm">
-                        MTD
-                      </Badge>
+                      <h2 className="text-sm font-semibold text-white">Revenue Over Time</h2>
+                      <Badge variant="emerald" size="sm">MTD</Badge>
                     </>
                   )}
                 </div>
-
                 {isLoading ? (
                   <SkeletonBlock className="h-52 w-full" />
                 ) : revenueChart.length === 0 ? (
-                  <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
-                    No revenue data available
-                  </div>
+                  <div className="h-52 flex items-center justify-center text-slate-500 text-sm">No revenue data available</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={208}>
                     <AreaChart data={revenueChart}>
@@ -238,28 +212,10 @@ export default function DashboardPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis
-                        dataKey="date"
-                        stroke="#475569"
-                        tick={{ fill: "#64748b", fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        stroke="#475569"
-                        tick={{ fill: "#64748b", fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                      />
+                      <XAxis dataKey="date" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip content={<ChartTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#7c3aed"
-                        strokeWidth={2}
-                        fill="url(#revenueGrad)"
-                      />
+                      <Area type="monotone" dataKey="revenue" stroke="#7c3aed" strokeWidth={2} fill="url(#revenueGrad)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -267,7 +223,6 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Conversion Bar Chart */}
           <div>
             <Card>
               <div className="p-5">
@@ -279,45 +234,23 @@ export default function DashboardPage() {
                     </>
                   ) : (
                     <>
-                      <h2 className="text-sm font-semibold text-white">
-                        Conversions by Vertical
-                      </h2>
-                      <Badge variant="blue" size="sm">
-                        30d
-                      </Badge>
+                      <h2 className="text-sm font-semibold text-white">Conversions by Vertical</h2>
+                      <Badge variant="blue" size="sm">30d</Badge>
                     </>
                   )}
                 </div>
-
                 {isLoading ? (
                   <SkeletonBlock className="h-52 w-full" />
                 ) : conversionChart.length === 0 ? (
-                  <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
-                    No conversion data
-                  </div>
+                  <div className="h-52 flex items-center justify-center text-slate-500 text-sm">No conversion data</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={208}>
                     <BarChart data={conversionChart}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis
-                        dataKey="vertical"
-                        stroke="#475569"
-                        tick={{ fill: "#64748b", fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        stroke="#475569"
-                        tick={{ fill: "#64748b", fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
+                      <XAxis dataKey="vertical" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
                       <Tooltip content={<ChartTooltip />} />
-                      <Bar
-                        dataKey="conversions"
-                        fill="#3b82f6"
-                        radius={[4, 4, 0, 0]}
-                      />
+                      <Bar dataKey="conversions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -328,7 +261,6 @@ export default function DashboardPage() {
 
         {/* Bottom Row */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {/* Recent Leads */}
           <div className="xl:col-span-2">
             <Card>
               <div className="p-5">
@@ -340,103 +272,54 @@ export default function DashboardPage() {
                     </>
                   ) : (
                     <>
-                      <h2 className="text-sm font-semibold text-white">
-                        Recent Leads
-                      </h2>
-                      
-                        href="/leads"
-                        className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
-                      >
-                        View all →
-                      </a>
+                      <h2 className="text-sm font-semibold text-white">Recent Leads</h2>
+                      <a href="/leads" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">View all &rarr;</a>
                     </>
                   )}
                 </div>
-
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-800">
-                        {["Name", "Vertical", "Status", "Score", "Created"].map(
-                          (h) => (
-                            <th
-                              key={h}
-                              className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider"
-                            >
-                              {isLoading ? (
-                                <SkeletonBlock className="h-3 w-12" />
-                              ) : (
-                                h
-                              )}
-                            </th>
-                          )
-                        )}
+                        {["Name", "Vertical", "Status", "Score", "Created"].map((h) => (
+                          <th key={h} className="text-left px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                            {isLoading ? <SkeletonBlock className="h-3 w-12" /> : h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
                       {isLoading
-                        ? Array.from({ length: 5 }).map((_, i) => (
-                            <TableRowSkeleton key={i} />
-                          ))
+                        ? Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} />)
                         : recentLeads.length === 0
                         ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-slate-500 text-sm">
-                              No recent leads
-                            </td>
+                            <td colSpan={5} className="px-4 py-8 text-center text-slate-500 text-sm">No recent leads</td>
                           </tr>
                         )
                         : recentLeads.map((lead: any) => (
-                            <tr
-                              key={lead.id}
-                              className="hover:bg-slate-800/30 transition-colors"
-                            >
-                              <td className="px-4 py-3 text-white font-medium">
-                                {lead.firstName} {lead.lastName}
-                              </td>
-                              <td className="px-4 py-3 text-slate-400">
-                                {lead.vertical}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span
-                                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    statusColors[lead.status] ??
-                                    "bg-slate-700 text-slate-300"
-                                  }`}
-                                >
-                                  <StatusDot status={lead.status} />
-                                  {lead.status.replace(/_/g, " ")}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        (lead.score ?? 0) >= 80
-                                          ? "bg-emerald-500"
-                                          : (lead.score ?? 0) >= 60
-                                          ? "bg-amber-500"
-                                          : "bg-red-500"
-                                      }`}
-                                      style={{ width: `${lead.score ?? 0}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-slate-400 text-xs">
-                                    {lead.score ?? 0}
-                                  </span>
+                          <tr key={lead.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="px-4 py-3 text-white font-medium">{lead.firstName} {lead.lastName}</td>
+                            <td className="px-4 py-3 text-slate-400">{lead.vertical}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[lead.status] ?? "bg-slate-700 text-slate-300"}`}>
+                                <StatusDot status={lead.status} />
+                                {lead.status.replace(/_/g, " ")}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden">
+                                  <div className={`h-full rounded-full ${(lead.score ?? 0) >= 80 ? "bg-emerald-500" : (lead.score ?? 0) >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${lead.score ?? 0}%` }} />
                                 </div>
-                              </td>
-                              <td className="px-4 py-3 text-slate-500 text-xs">
-                                {lead.createdAt
-                                  ? new Date(lead.createdAt).toLocaleDateString(
-                                      "en-US",
-                                      { month: "short", day: "numeric" }
-                                    )
-                                  : "—"}
-                              </td>
-                            </tr>
-                          ))}
+                                <span className="text-slate-400 text-xs">{lead.score ?? 0}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 text-xs">
+                              {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -446,15 +329,10 @@ export default function DashboardPage() {
 
           {/* Right Column */}
           <div className="space-y-4">
-            {/* Top Campaigns */}
             <Card>
               <div className="p-5">
                 <h2 className="text-sm font-semibold text-white mb-4">
-                  {isLoading ? (
-                    <SkeletonBlock className="h-4 w-28" />
-                  ) : (
-                    "Top Campaigns"
-                  )}
+                  {isLoading ? <SkeletonBlock className="h-4 w-28" /> : "Top Campaigns"}
                 </h2>
                 <div className="space-y-3">
                   {isLoading
@@ -468,26 +346,17 @@ export default function DashboardPage() {
                         </div>
                       ))
                     : topCampaigns.length === 0
-                    ? (
-                      <p className="text-slate-500 text-sm">No campaigns yet</p>
-                    )
+                    ? <p className="text-slate-500 text-sm">No campaigns yet</p>
                     : topCampaigns.map((c: any) => {
                         const pct = c.budget > 0 ? Math.min(100, ((c.spent ?? 0) / c.budget) * 100) : 0;
                         return (
                           <div key={c.id}>
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm text-slate-300 truncate max-w-[140px]">
-                                {c.name}
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                {pct.toFixed(0)}%
-                              </span>
+                              <span className="text-sm text-slate-300 truncate max-w-[140px]">{c.name}</span>
+                              <span className="text-xs text-slate-500">{pct.toFixed(0)}%</span>
                             </div>
                             <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-violet-500"
-                                style={{ width: `${pct}%` }}
-                              />
+                              <div className="h-full rounded-full bg-violet-500" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
                         );
@@ -496,15 +365,10 @@ export default function DashboardPage() {
               </div>
             </Card>
 
-            {/* Agent Activity */}
             <Card>
               <div className="p-5">
                 <h2 className="text-sm font-semibold text-white mb-4">
-                  {isLoading ? (
-                    <SkeletonBlock className="h-4 w-24" />
-                  ) : (
-                    "Agent Activity"
-                  )}
+                  {isLoading ? <SkeletonBlock className="h-4 w-24" /> : "Agent Activity"}
                 </h2>
                 <div className="space-y-3">
                   {isLoading
@@ -519,33 +383,17 @@ export default function DashboardPage() {
                         </div>
                       ))
                     : agentActivity.length === 0
-                    ? (
-                      <p className="text-slate-500 text-sm">No agent activity</p>
-                    )
+                    ? <p className="text-slate-500 text-sm">No agent activity</p>
                     : agentActivity.map((agent: any) => (
                         <div key={agent.id} className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
-                            <svg
-                              className="w-4 h-4 text-violet-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"
-                              />
+                            <svg className="w-4 h-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
                             </svg>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white truncate">
-                              {agent.name}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {agent.type}
-                            </p>
+                            <p className="text-sm text-white truncate">{agent.name}</p>
+                            <p className="text-xs text-slate-500">{agent.type}</p>
                           </div>
                           <StatusDot status={agent.status} />
                         </div>
