@@ -20,7 +20,7 @@ interface StatusDotProps {
   className?: string;
 }
 
-export function StatusDot({ status, className }: StatusDotProps) {
+export default function StatusDot({ status, className }: StatusDotProps) {
   return (
     <span
       className={cn("inline-block w-2 h-2 rounded-full", statusMap[status] ?? "bg-slate-500", className)}

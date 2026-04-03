@@ -7,7 +7,7 @@ interface CardProps {
   hoverable?: boolean;
 }
 
-export function Card({ children, className, onClick, hoverable }: CardProps) {
+export fdefault unction Card({ children, className, onClick, hoverable }: CardProps) {
   return (
     <div
       onClick={onClick}

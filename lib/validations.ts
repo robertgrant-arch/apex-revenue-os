@@ -52,7 +52,7 @@ export const listLeadsSchema = paginationSchema.extend({
 });
 
 // Campaign schemas
-export const createCampaignSchema = z.object({
+const campaignBaseSchema = z.object({
   name: z.string().min(1, "Campaign name is required").max(200).trim(),
   status: z.nativeEnum(CampaignStatus).default(CampaignStatus.DRAFT),
   channel: z.string().min(1, "Channel is required").max(100).trim(),
@@ -60,7 +60,8 @@ export const createCampaignSchema = z.object({
   spend: z.number().min(0).default(0),
   startDate: z.coerce.date().optional().nullable(),
   endDate: z.coerce.date().optional().nullable(),
-}).refine(
+});
+export const createCampaignSchema = campaignBaseSchema.refine(
   (data) => {
     if (data.startDate && data.endDate) return data.endDate > data.startDate;
     return true;
@@ -68,7 +69,7 @@ export const createCampaignSchema = z.object({
   { message: "End date must be after start date", path: ["endDate"] }
 );
 
-export const updateCampaignSchema = createCampaignSchema.partial().extend({ id: cuidSchema });
+export const updateCampaignSchema = campaignBaseSchema.partial().extend({ id: cuidSchema });
 
 // Creative schemas
 export const createCreativeSchema = z.object({
