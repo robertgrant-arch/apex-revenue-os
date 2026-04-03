@@ -1,325 +1,289 @@
 "use client";
 import { useState } from "react";
-import {
-  Brain, Zap, Shield, Megaphone, BarChart2, Users,
-  Activity, CheckCircle, Clock, AlertCircle, Play, Pause, Settings
-} from "lucide-react";
-import { Toast, useToast } from "@/components/ui/Toast";
+import { Search, Play, Pause, Square, Zap, Brain, Palette, Radio, Megaphone, GitBranch, BarChart2, ChevronRight, Clock, CheckCircle2 } from "lucide-react";
+import Card from "@/components/ui/Card";
+import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/Toast";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  status: "active" | "idle" | "error" | "paused";
-  tasksToday: number;
-  successRate: number;
-  avgLatency: number;
-  description: string;
-  capabilities: string[];
-  recentActions: RecentAction[];
-  icon: React.ReactNode;
-  color: string;
-}
-
-interface RecentAction {
-  id: string;
-  action: string;
-  result: string;
-  time: string;
-  status: "success" | "pending" | "error";
-}
-
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-const AGENTS: Agent[] = [
+const AGENTS = [
   {
-    id: "lead-scorer",
-    name: "LeadScorer",
-    role: "Lead Intelligence",
-    status: "active",
-    tasksToday: 1847,
-    successRate: 98.2,
-    avgLatency: 142,
-    description: "Scores and prioritizes inbound leads using ML models trained on 3M+ historical conversions. Integrates Medicare compliance rules and agent availability.",
-    capabilities: ["Real-time lead scoring", "Intent classification", "Compliance pre-screening", "Agent routing", "Duplicate detection"],
-    icon: <Brain size={20} />,
-    color: "violet",
-    recentActions: [
-      { id: "a1", action: "Scored lead #L-20481", result: "Score: 94 → Routed to Agent Martinez", time: "2m ago", status: "success" },
-      { id: "a2", action: "Flagged duplicate lead", result: "L-20479 matches L-20301", time: "4m ago", status: "success" },
-      { id: "a3", action: "Compliance pre-screen", result: "PASSED — Medicare eligibility verified", time: "5m ago", status: "success" },
-      { id: "a4", action: "Scored lead #L-20475", result: "Score: 61 → Queued for nurture", time: "7m ago", status: "success" },
+    id: "ORACLE", name: "ORACLE", role: "Lead Intelligence", icon: Brain, color: "emerald",
+    description: "Scores and qualifies inbound leads using behavioral signals, firmographic data, and predictive ML models.",
+    status: "running", uptime: "99.8%", actionsToday: 1840, successRate: 97.2,
+    model: "claude-sonnet-4-20250514", latency: "1.2s",
+    log: [
+      { time: "14:22:01", action: "Scored lead: Margaret Chen → 94/100", type: "success" },
+      { time: "14:21:47", action: "Flagged duplicate: John Smith (existing contact)", type: "warning" },
+      { time: "14:21:12", action: "Scored 12 leads in batch job #4821", type: "success" },
+      { time: "14:20:33", action: "Low-quality lead rejected: score 22", type: "info" },
+      { time: "14:19:55", action: "Webhook received: 34 new leads from Facebook", type: "info" },
+      { time: "14:18:41", action: "Scored lead: Patricia Davis → 91/100", type: "success" },
     ],
   },
   {
-    id: "campaign-optimizer",
-    name: "CampaignOptimizer",
-    role: "Media & Spend",
-    status: "active",
-    tasksToday: 312,
-    successRate: 94.7,
-    avgLatency: 890,
-    description: "Continuously optimizes bid strategies, creative rotation, and budget allocation across channels. Runs multi-armed bandit experiments for creative testing.",
-    capabilities: ["Bid optimization", "Budget reallocation", "Creative A/B testing", "Channel mix modeling", "ROAS forecasting"],
-    icon: <Zap size={20} />,
-    color: "amber",
-    recentActions: [
-      { id: "b1", action: "Shifted $1,200 budget", result: "Facebook → Google (better CPL signal)", time: "12m ago", status: "success" },
-      { id: "b2", action: "Paused underperforming creative", result: "CTR 1.2% < threshold 2.0%", time: "34m ago", status: "success" },
-      { id: "b3", action: "Launched A/B test", result: "Medicare video vs. static image", time: "1h ago", status: "success" },
-      { id: "b4", action: "ROAS forecast updated", result: "Q3 projected: 4.2x (↑ from 3.8x)", time: "2h ago", status: "success" },
+    id: "ARCHITECT", name: "ARCHITECT", role: "Campaign Strategy", icon: GitBranch, color: "violet",
+    description: "Designs and optimizes campaign architecture, audience segmentation, and budget allocation strategies.",
+    status: "running", uptime: "98.4%", actionsToday: 420, successRate: 94.8,
+    model: "claude-sonnet-4-20250514", latency: "3.4s",
+    log: [
+      { time: "14:15:22", action: "Rebuilt Medicare AEP targeting model", type: "success" },
+      { time: "14:08:11", action: "Reallocated $4,200 from underperforming ad set", type: "success" },
+      { time: "13:55:44", action: "A/B test concluded: Variant B +18% CTR", type: "success" },
+      { time: "13:42:10", action: "Audience overlap detected in campaigns #12, #18", type: "warning" },
     ],
   },
   {
-    id: "compliance-guardian",
-    name: "ComplianceGuardian",
-    role: "Regulatory & Legal",
-    status: "active",
-    tasksToday: 5621,
-    successRate: 99.8,
-    avgLatency: 48,
-    description: "Real-time compliance monitoring for all outbound communications, ads, and agent scripts. Enforces CMS, TCPA, and state-specific regulations automatically.",
-    capabilities: ["CMS ad review", "TCPA scrubbing", "Script compliance check", "DNC list management", "Audit trail generation"],
-    icon: <Shield size={20} />,
-    color: "emerald",
-    recentActions: [
-      { id: "c1", action: "Blocked non-compliant SMS", result: "Missing opt-out language", time: "1m ago", status: "success" },
-      { id: "c2", action: "Approved email campaign", result: "Medicare Advantage Q3 — PASSED", time: "8m ago", status: "success" },
-      { id: "c3", action: "DNC scrub completed", result: "847 numbers removed from list", time: "22m ago", status: "success" },
-      { id: "c4", action: "Script review — Agent Chen", result: "1 flag: unapproved benefit claim", time: "45m ago", status: "error" },
+    id: "CREATOR", name: "CREATOR", role: "Creative Generation", icon: Palette, color: "amber",
+    description: "Generates ad copy, email sequences, landing page content, and creative assets optimized per vertical.",
+    status: "running", uptime: "99.1%", actionsToday: 312, successRate: 91.0,
+    model: "claude-sonnet-4-20250514", latency: "4.8s",
+    log: [
+      { time: "14:16:08", action: "Generated 6 ad variants for Medicare AEP", type: "success" },
+      { time: "14:10:33", action: "Email sequence drafted: 5-touch Auto renewal", type: "success" },
+      { time: "14:02:19", action: "Compliance review flagged: 2 claims need softening", type: "warning" },
+      { time: "13:48:55", action: "Landing page copy personalized for CA audience", type: "success" },
     ],
   },
   {
-    id: "content-creator",
-    name: "ContentCreator",
-    role: "Creative Generation",
-    status: "idle",
-    tasksToday: 47,
-    successRate: 91.5,
-    avgLatency: 4200,
-    description: "Generates compliant ad copy, landing pages, email sequences, and scripts tuned to each vertical and audience segment using retrieval-augmented generation.",
-    capabilities: ["Ad copy generation", "Landing page creation", "Email sequence drafting", "Script writing", "Personalization at scale"],
-    icon: <Megaphone size={20} />,
-    color: "blue",
-    recentActions: [
-      { id: "d1", action: "Generated 12 ad variants", result: "ACA open enrollment campaign", time: "15m ago", status: "success" },
-      { id: "d2", action: "Drafted email sequence", result: "Final expense — 5-touch nurture", time: "1h ago", status: "success" },
-      { id: "d3", action: "Compliance revision", result: "Removed 'guaranteed' from copy", time: "2h ago", status: "pending" },
+    id: "SIGNAL", name: "SIGNAL", role: "Intent Detection", icon: Radio, color: "blue",
+    description: "Monitors first and third-party signals to detect real-time purchase intent and trigger workflows.",
+    status: "running", uptime: "99.9%", actionsToday: 2840, successRate: 88.4,
+    model: "claude-sonnet-4-20250514", latency: "0.8s",
+    log: [
+      { time: "14:22:18", action: "Intent signal: 'medicare supplement plans' — 48 users", type: "success" },
+      { time: "14:21:44", action: "Retirement search pattern detected — segment created", type: "success" },
+      { time: "14:20:12", action: "Churned customer re-engagement trigger fired", type: "info" },
+      { time: "14:18:30", action: "Price comparison intent: 12 auto leads flagged hot", type: "success" },
     ],
   },
   {
-    id: "analytics-engine",
-    name: "AnalyticsEngine",
-    role: "Insights & Reporting",
-    status: "active",
-    tasksToday: 89,
-    successRate: 97.1,
-    avgLatency: 2100,
-    description: "Aggregates cross-channel attribution, builds real-time performance dashboards, detects anomalies, and surfaces actionable insights to the revenue team.",
-    capabilities: ["Multi-touch attribution", "Anomaly detection", "Revenue forecasting", "Cohort analysis", "Automated reporting"],
-    icon: <BarChart2 size={20} />,
-    color: "pink",
-    recentActions: [
-      { id: "e1", action: "Anomaly detected", result: "CPL spike +40% — Medicare, Facebook", time: "3m ago", status: "error" },
-      { id: "e2", action: "Weekly report generated", result: "Sent to 6 stakeholders", time: "2h ago", status: "success" },
-      { id: "e3", action: "Attribution model updated", result: "Added new touchpoint: Direct Mail", time: "4h ago", status: "success" },
+    id: "REACH", name: "REACH", role: "Multi-channel Outreach", icon: Megaphone, color: "rose",
+    description: "Executes personalized outreach across email, SMS, paid social, and display channels.",
+    status: "idle", uptime: "97.6%", actionsToday: 680, successRate: 82.1,
+    model: "claude-sonnet-4-20250514", latency: "2.1s",
+    log: [
+      { time: "13:48:10", action: "Email sequence launched: 2,400 contacts", type: "success" },
+      { time: "13:35:22", action: "SMS campaign delivered: 98.2% delivery rate", type: "success" },
+      { time: "13:20:44", action: "Retargeting audience synced to Meta Ads", type: "success" },
+      { time: "13:05:11", action: "Unsubscribe processed: 14 contacts removed", type: "info" },
     ],
   },
   {
-    id: "crm-sync",
-    name: "CRMSync",
-    role: "Data & Integrations",
-    status: "paused",
-    tasksToday: 0,
-    successRate: 96.3,
-    avgLatency: 320,
-    description: "Bidirectional sync between APEX and downstream CRMs. Manages lead handoffs, updates disposition data, and maintains data hygiene across the stack.",
-    capabilities: ["Salesforce sync", "HubSpot integration", "Lead deduplication", "Disposition tracking", "Data enrichment"],
-    icon: <Users size={20} />,
-    color: "teal",
-    recentActions: [
-      { id: "f1", action: "Sync paused", result: "Manual intervention requested", time: "1h ago", status: "pending" },
-      { id: "f2", action: "Synced 234 leads", result: "To Salesforce — Medicare Q3", time: "3h ago", status: "success" },
+    id: "CONVERT", name: "CONVERT", role: "Sales Enablement", icon: Zap, color: "amber",
+    description: "Generates personalized proposals, handles objections, and guides leads through the final close.",
+    status: "idle", uptime: "98.2%", actionsToday: 228, successRate: 93.4,
+    model: "claude-sonnet-4-20250514", latency: "2.9s",
+    log: [
+      { time: "13:44:08", action: "Proposal PDF generated for James Thompson", type: "success" },
+      { time: "13:30:55", action: "Objection script updated: price concern variant", type: "success" },
+      { time: "13:15:22", action: "Follow-up sequence triggered for 8 warm leads", type: "info" },
+    ],
+  },
+  {
+    id: "LOOP", name: "LOOP", role: "Attribution & Learning", icon: BarChart2, color: "violet",
+    description: "Closes the learning loop with multi-touch attribution, ROI analysis, and model retraining signals.",
+    status: "idle", uptime: "99.3%", actionsToday: 94, successRate: 99.1,
+    model: "claude-sonnet-4-20250514", latency: "6.2s",
+    log: [
+      { time: "13:00:00", action: "Attribution model updated with 187 closed deals", type: "success" },
+      { time: "12:00:00", action: "Hourly performance report generated", type: "info" },
+      { time: "11:00:00", action: "Model drift detected: retraining queued", type: "warning" },
     ],
   },
 ];
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-const statusConfig = {
-  active: { label: "Active", color: "emerald", icon: <CheckCircle size={12} /> },
-  idle: { label: "Idle", color: "blue", icon: <Clock size={12} /> },
-  error: { label: "Error", color: "red", icon: <AlertCircle size={12} /> },
-  paused: { label: "Paused", color: "amber", icon: <Pause size={12} /> },
+type AgentStatus = "running" | "idle" | "paused";
+
+const colorMap: Record<string, string> = {
+  emerald: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  violet: "text-violet-400 bg-violet-400/10 border-violet-400/20",
+  amber: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+  blue: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  rose: "text-rose-400 bg-rose-400/10 border-rose-400/20",
 };
 
-const actionStatusIcon = (s: RecentAction["status"]) => {
-  if (s === "success") return <CheckCircle size={13} className="text-emerald-400 shrink-0" />;
-  if (s === "error") return <AlertCircle size={13} className="text-red-400 shrink-0" />;
-  return <Clock size={13} className="text-amber-400 shrink-0" />;
+const statusColor: Record<AgentStatus, string> = {
+  running: "bg-emerald-400",
+  idle: "bg-slate-500",
+  paused: "bg-amber-400",
 };
 
-// ── Page ───────────────────────────────────────────────────────────────────────
+const logTypeColor: Record<string, string> = {
+  success: "text-emerald-400",
+  warning: "text-amber-400",
+  info: "text-slate-400",
+  error: "text-rose-400",
+};
+
 export default function AgentsPage() {
-  const { toasts, addToast, removeToast } = useToast();
-  const [agents, setAgents] = useState<Agent[]>(AGENTS);
-  const [selectedId, setSelectedId] = useState<string>(AGENTS[0].id);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | AgentStatus>("all");
+  const [selected, setSelected] = useState<string | null>("ORACLE");
+  const [agentStates, setAgentStates] = useState<Record<string, AgentStatus>>(
+    Object.fromEntries(AGENTS.map(a => [a.id, a.status as AgentStatus]))
+  );
 
-  const selected = agents.find((a) => a.id === selectedId) ?? agents[0];
-  const sc = statusConfig[selected.status];
+  const filtered = AGENTS.filter(a => {
+    const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) || a.role.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || agentStates[a.id] === statusFilter;
+    return matchSearch && matchStatus;
+  });
 
-  const toggleStatus = (id: string) => {
-    setAgents((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a;
-        const next = a.status === "paused" ? "active" : "paused";
-        addToast(`${a.name} ${next === "active" ? "resumed" : "paused"}`, "info");
-        return { ...a, status: next };
-      })
-    );
+  const selectedAgent = AGENTS.find(a => a.id === selected);
+
+  const handleStart = (id: string) => {
+    setAgentStates(s => ({ ...s, [id]: "running" }));
+    toast.success(`${id} agent started`);
+  };
+  const handlePause = (id: string) => {
+    setAgentStates(s => ({ ...s, [id]: "paused" }));
+    toast(`${id} agent paused`, "warning");
+  };
+  const handleStop = (id: string) => {
+    setAgentStates(s => ({ ...s, [id]: "idle" }));
+    toast(`${id} agent stopped`, "info");
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <Toast toasts={toasts} removeToast={removeToast} />
-
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Agent Control Center</h1>
-        <p className="text-slate-400 text-sm mt-1">Monitor and manage your AI agent fleet</p>
+    <div className="p-6 h-full flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">AI Agents</h1>
+          <p className="text-slate-400 text-sm mt-0.5">7-agent revenue operating system</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="flex items-center gap-1.5 text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            {Object.values(agentStates).filter(s => s === "running").length} running
+          </span>
+        </div>
       </div>
 
-      {/* Fleet Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: "Active Agents", value: agents.filter(a => a.status === "active").length, color: "emerald" },
-          { label: "Tasks Today", value: agents.reduce((a, ag) => a + ag.tasksToday, 0).toLocaleString(), color: "violet" },
-          { label: "Avg Success Rate", value: (agents.reduce((a, ag) => a + ag.successRate, 0) / agents.length).toFixed(1) + "%", color: "blue" },
-          { label: "Agents Paused", value: agents.filter(a => a.status === "paused" || a.status === "idle").length, color: "amber" },
-        ].map((s) => (
-          <div key={s.label} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-            <div className={`text-2xl font-bold text-${s.color}-400`}>{s.value}</div>
-            <div className="text-slate-400 text-xs mt-1">{s.label}</div>
-          </div>
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search agents..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+          />
+        </div>
+        {(["all", "running", "idle", "paused"] as const).map(s => (
+          <button key={s} onClick={() => setStatusFilter(s)} className={cn("px-3 py-2 text-sm rounded-lg font-medium capitalize transition-all border", statusFilter === s ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-slate-800/50 text-slate-400 border-slate-700/50 hover:text-white")}>
+            {s}
+          </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* All Agents Grid */}
-        <div className="col-span-4 space-y-3">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">All Agents</h2>
-          {agents.map((agent) => {
-            const asc = statusConfig[agent.status];
-            const isSelected = agent.id === selectedId;
+      <div className="flex gap-6 flex-1 min-h-0">
+        <div className="w-72 flex-shrink-0 space-y-2 overflow-y-auto">
+          {filtered.map(agent => {
+            const Icon = agent.icon;
+            const st = agentStates[agent.id];
             return (
-              <div
-                key={agent.id}
-                onClick={() => setSelectedId(agent.id)}
-                className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                  isSelected
-                    ? `border-${agent.color}-500/40 bg-${agent.color}-500/10`
-                    : "border-slate-700/50 bg-slate-800/50 hover:border-slate-600/50 hover:bg-slate-800"
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-xl bg-${agent.color}-500/10 flex items-center justify-center text-${agent.color}-400 shrink-0`}>
-                  {agent.icon}
+              <Card key={agent.id} hoverable onClick={() => setSelected(agent.id)} className={cn("p-4 transition-all", selected === agent.id && "border-emerald-500/40 bg-emerald-500/5")}>
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg border", colorMap[agent.color])}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{agent.name}</span>
+                      <span className={cn("w-1.5 h-1.5 rounded-full", statusColor[st])} />
+                    </div>
+                    <p className="text-xs text-slate-400 truncate">{agent.role}</p>
+                  </div>
+                  <ChevronRight className={cn("w-4 h-4 text-slate-600 transition-transform", selected === agent.id && "rotate-90 text-emerald-400")} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white">{agent.name}</div>
-                  <div className="text-xs text-slate-500">{agent.role}</div>
+                <div className="mt-3 flex gap-2">
+                  <div className="flex-1 text-center">
+                    <p className="text-xs text-slate-500">Actions</p>
+                    <p className="text-sm font-semibold text-white">{agent.actionsToday.toLocaleString()}</p>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <p className="text-xs text-slate-500">Success</p>
+                    <p className="text-sm font-semibold text-emerald-400">{agent.successRate}%</p>
+                  </div>
                 </div>
-                <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-${asc.color}-500/10 text-${asc.color}-400 border border-${asc.color}-500/20`}>
-                  {asc.icon}{asc.label}
-                </span>
-              </div>
+              </Card>
             );
           })}
         </div>
 
-        {/* Agent Detail Panel */}
-        <div className="col-span-8 space-y-4">
-          {/* Detail Header */}
-          <div className={`flex items-start justify-between p-5 rounded-xl border border-${selected.color}-500/30 bg-${selected.color}-500/5`}>
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-2xl bg-${selected.color}-500/15 flex items-center justify-center text-${selected.color}-400`}>
-                {selected.icon}
-              </div>
-              <div>
-                <div className="text-xl font-bold text-white">{selected.name}</div>
-                <div className="text-slate-400 text-sm">{selected.role}</div>
-                <span className={`mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-${sc.color}-500/10 text-${sc.color}-400 border border-${sc.color}-500/20`}>
-                  {sc.icon}{sc.label}
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => toggleStatus(selected.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700/50 text-slate-300 hover:text-white hover:bg-slate-700 text-sm transition-all"
-              >
-                {selected.status === "paused" ? <Play size={14} /> : <Pause size={14} />}
-                {selected.status === "paused" ? "Resume" : "Pause"}
-              </button>
-              <button
-                onClick={() => addToast(`${selected.name} settings — coming soon`, "info")}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700/50 text-slate-300 hover:text-white hover:bg-slate-700 text-sm transition-all"
-              >
-                <Settings size={14} /> Configure
-              </button>
-            </div>
-          </div>
-
-          {/* Metrics */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Tasks Today", value: selected.tasksToday.toLocaleString(), icon: <Activity size={16} /> },
-              { label: "Success Rate", value: `${selected.successRate}%`, icon: <CheckCircle size={16} /> },
-              { label: "Avg Latency", value: `${selected.avgLatency}ms`, icon: <Zap size={16} /> },
-            ].map((m) => (
-              <div key={m.label} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-                <div className={`text-${selected.color}-400 mb-2`}>{m.icon}</div>
-                <div className="text-xl font-bold text-white">{m.value}</div>
-                <div className="text-slate-500 text-xs mt-0.5">{m.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Description + Capabilities */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Description</h3>
-              <p className="text-sm text-slate-300 leading-relaxed">{selected.description}</p>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Capabilities</h3>
-              <ul className="space-y-1.5">
-                {selected.capabilities.map((cap) => (
-                  <li key={cap} className="flex items-center gap-2 text-sm text-slate-300">
-                    <CheckCircle size={12} className={`text-${selected.color}-400 shrink-0`} />
-                    {cap}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Recent Actions */}
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Recent Actions</h3>
-            <div className="space-y-2">
-              {selected.recentActions.map((action) => (
-                <div key={action.id} className="flex items-start gap-3 py-2 border-b border-slate-700/30 last:border-0">
-                  {actionStatusIcon(action.status)}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm text-white">{action.action}</span>
-                    <span className="text-xs text-slate-500 ml-2">{action.result}</span>
+        {selectedAgent && (
+          <div className="flex-1 space-y-4 overflow-y-auto">
+            <Card className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-3 rounded-xl border", colorMap[selectedAgent.color])}>
+                    <selectedAgent.icon className="w-5 h-5" />
                   </div>
-                  <span className="text-xs text-slate-600 shrink-0">{action.time}</span>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">{selectedAgent.name}</h2>
+                    <p className="text-sm text-slate-400">{selectedAgent.role}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => agentStates[selectedAgent.id] === "running" ? handlePause(selectedAgent.id) : handleStart(selectedAgent.id)}
+                    className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all", agentStates[selectedAgent.id] === "running" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30")}
+                  >
+                    {agentStates[selectedAgent.id] === "running" ? <><Pause className="w-3.5 h-3.5" /> Pause</> : <><Play className="w-3.5 h-3.5" /> Start</>}
+                  </button>
+                  <button
+                    onClick={() => handleStop(selectedAgent.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition-all"
+                  >
+                    <Square className="w-3.5 h-3.5" /> Stop
+                  </button>
+                </div>
+              </div>
+              <p className="text-sm text-slate-400 mb-4">{selectedAgent.description}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Status", value: agentStates[selectedAgent.id], highlight: agentStates[selectedAgent.id] === "running" ? "text-emerald-400" : "text-slate-400" },
+                  { label: "Uptime", value: selectedAgent.uptime, highlight: "text-emerald-400" },
+                  { label: "Avg Latency", value: selectedAgent.latency, highlight: "text-white" },
+                  { label: "Actions Today", value: selectedAgent.actionsToday.toLocaleString(), highlight: "text-white" },
+                ].map(stat => (
+                  <div key={stat.label} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/30">
+                    <p className="text-xs text-slate-500 mb-1">{stat.label}</p>
+                    <p className={cn("text-sm font-semibold capitalize", stat.highlight)}>{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-semibold text-white">Action Log</h3>
+              </div>
+              <div className="space-y-2">
+                {selectedAgent.log.map((entry, i) => (
+                  <div key={i} className="flex items-start gap-3 py-2 border-b border-slate-700/30 last:border-0">
+                    <CheckCircle2 className={cn("w-3.5 h-3.5 mt-0.5 flex-shrink-0", logTypeColor[entry.type])} />
+                    <div className="flex-1">
+                      <p className="text-sm text-slate-300">{entry.action}</p>
+                    </div>
+                    <span className="text-xs text-slate-500 flex-shrink-0">{entry.time}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
+}
+
+function Play({ className }: { className?: string }) {
+  return <svg className={className} fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>;
+}
+function Pause({ className }: { className?: string }) {
+  return <svg className={className} fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>;
+}
+function Square({ className }: { className?: string }) {
+  return <svg className={className} fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z" /></svg>;
 }

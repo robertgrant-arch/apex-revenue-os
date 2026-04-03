@@ -1,483 +1,203 @@
 "use client";
 import { useState } from "react";
-import {
-  User, Bell, Shield, Key, Users, Plug, Save,
-  Plus, Copy, Eye, EyeOff, Check, Trash2
-} from "lucide-react";
-import Modal from "@/components/ui/Modal";
-import { Toast, useToast } from "@/components/ui/Toast";
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-interface TeamMember { id: string; name: string; email: string; role: string; status: "active" | "pending"; }
-interface Integration { id: string; name: string; description: string; status: "connected" | "disconnected"; icon: string; }
-interface ApiKey { id: string; name: string; key: string; created: string; lastUsed: string; visible: boolean; }
-
-// ── Mock Data ──────────────────────────────────────────────────────────────────
-const INIT_MEMBERS: TeamMember[] = [
-  { id: "m1", name: "Bob Grant", email: "robert.grant@selectquote.com", role: "Admin", status: "active" },
-  { id: "m2", name: "Jane Martinez", email: "j.martinez@selectquote.com", role: "Agent", status: "active" },
-  { id: "m3", name: "Lee Chen", email: "l.chen@selectquote.com", role: "Analyst", status: "pending" },
-];
-
-const INIT_INTEGRATIONS: Integration[] = [
-  { id: "i1", name: "Salesforce", description: "CRM sync and lead handoff", status: "connected", icon: "S" },
-  { id: "i2", name: "Google Ads", description: "Campaign management and performance data", status: "connected", icon: "G" },
-  { id: "i3", name: "Facebook Ads", description: "Social campaign automation", status: "connected", icon: "F" },
-  { id: "i4", name: "HubSpot", description: "Marketing automation and email sequences", status: "disconnected", icon: "H" },
-  { id: "i5", name: "Twilio", description: "SMS and voice communication", status: "disconnected", icon: "T" },
-  { id: "i6", name: "Stripe", description: "Billing and payment processing", status: "disconnected", icon: "St" },
-];
-
-const INIT_KEYS: ApiKey[] = [
-  { id: "k1", name: "Production Key", key: "apex_prod_sk_4f8a2b3c9d1e5f7a", created: "2025-06-01", lastUsed: "2025-07-14", visible: false },
-  { id: "k2", name: "Development Key", key: "apex_dev_sk_1a2b3c4d5e6f7a8b", created: "2025-06-15", lastUsed: "2025-07-13", visible: false },
-];
+import { Plug, Globe, User, Users, Bell, Check, X, Plus } from "lucide-react";
+import Card from "@/components/ui/Card";
+import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/Toast";
 
 const TABS = [
-  { id: "profile", label: "Profile", icon: <User size={16} /> },
-  { id: "team", label: "Team", icon: <Users size={16} /> },
-  { id: "integrations", label: "Integrations", icon: <Plug size={16} /> },
-  { id: "notifications", label: "Notifications", icon: <Bell size={16} /> },
-  { id: "security", label: "Security", icon: <Shield size={16} /> },
-  { id: "api", label: "API Keys", icon: <Key size={16} /> },
+  { id: "integrations", label: "Integrations", icon: Plug },
+  { id: "verticals", label: "Verticals", icon: Globe },
+  { id: "account", label: "Account", icon: User },
+  { id: "team", label: "Team", icon: Users },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
-// ── Page ───────────────────────────────────────────────────────────────────────
+const INTEGRATIONS = [
+  { id: "salesforce", name: "Salesforce CRM", description: "Sync leads and pipeline data", category: "CRM", connected: true, logo: "SF" },
+  { id: "hubspot", name: "HubSpot", description: "Contact and deal management", category: "CRM", connected: false, logo: "HS" },
+  { id: "facebook", name: "Meta Ads", description: "Facebook and Instagram ad campaigns", category: "Advertising", connected: true, logo: "FB" },
+  { id: "google", name: "Google Ads", description: "Search and display advertising", category: "Advertising", connected: true, logo: "GA" },
+  { id: "klaviyo", name: "Klaviyo", description: "Email marketing automation", category: "Email", connected: false, logo: "KL" },
+  { id: "twilio", name: "Twilio", description: "SMS and voice communications", category: "Comms", connected: true, logo: "TW" },
+  { id: "slack", name: "Slack", description: "Team alerts and notifications", category: "Comms", connected: true, logo: "SL" },
+  { id: "segment", name: "Segment", description: "Customer data platform", category: "Data", connected: false, logo: "SG" },
+];
+
+const VERTICALS = [
+  { id: "medicare", name: "Medicare", active: true, leads: 2840, ruleCount: 48 },
+  { id: "auto", name: "Auto Insurance", active: true, leads: 1240, ruleCount: 32 },
+  { id: "life", name: "Life Insurance", active: true, leads: 680, ruleCount: 41 },
+  { id: "home", name: "Home Insurance", active: false, leads: 320, ruleCount: 28 },
+];
+
+const TEAM = [
+  { id: 1, name: "Alex Rivera", email: "alex@company.com", role: "Admin", status: "active", avatar: "AR" },
+  { id: 2, name: "Jordan Park", email: "jordan@company.com", role: "Manager", status: "active", avatar: "JP" },
+  { id: 3, name: "Casey Morgan", email: "casey@company.com", role: "Analyst", status: "active", avatar: "CM" },
+  { id: 4, name: "Taylor Kim", email: "taylor@company.com", role: "Analyst", status: "invited", avatar: "TK" },
+];
+
+const NOTIFICATIONS = [
+  { id: "lead_hot", label: "Hot lead scored (90+)", description: "Instant alert when ORACLE scores a lead 90+", enabled: true },
+  { id: "campaign_budget", label: "Campaign budget threshold", description: "Alert at 80% budget spend", enabled: true },
+  { id: "compliance_flag", label: "Compliance violation flagged", description: "Immediate alert on compliance issue", enabled: true },
+  { id: "agent_error", label: "Agent error or timeout", description: "Alert when any agent fails or times out", enabled: true },
+  { id: "daily_report", label: "Daily performance report", description: "Morning summary of previous day's metrics", enabled: false },
+  { id: "weekly_summary", label: "Weekly revenue summary", description: "Monday morning pipeline and attribution report", enabled: true },
+];
+
 export default function SettingsPage() {
-  const { toasts, addToast, removeToast } = useToast();
-  const [activeTab, setActiveTab] = useState("profile");
-  const [members, setMembers] = useState<TeamMember[]>(INIT_MEMBERS);
-  const [integrations, setIntegrations] = useState<Integration[]>(INIT_INTEGRATIONS);
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>(INIT_KEYS);
+  const [activeTab, setActiveTab] = useState("integrations");
+  const [integrations, setIntegrations] = useState(INTEGRATIONS);
+  const [verticals, setVerticals] = useState(VERTICALS);
+  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [account, setAccount] = useState({ name: "Bob Grant", email: "robert.grant@selectquote.com", company: "SelectQuote", timezone: "America/Chicago" });
 
-  // Profile form
-  const [profile, setProfile] = useState({ name: "Bob Grant", email: "robert.grant@selectquote.com", company: "SelectQuote", role: "Product / Strategy" });
-
-  // Notification prefs
-  const [notifs, setNotifs] = useState({ leadAlerts: true, complianceFlags: true, campaignReports: false, agentErrors: true, weeklyDigest: true });
-
-  // Invite modal
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: "", role: "Agent" });
-
-  // Connect modal
-  const [connectOpen, setConnectOpen] = useState(false);
-  const [connectTarget, setConnectTarget] = useState<Integration | null>(null);
-  const [connectForm, setConnectForm] = useState({ apiKey: "", accountId: "" });
-
-  // New API Key modal
-  const [newKeyOpen, setNewKeyOpen] = useState(false);
-  const [newKeyName, setNewKeyName] = useState("");
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleSaveProfile = () => {
-    if (!profile.name.trim()) { addToast("Name is required", "error"); return; }
-    addToast("Profile saved successfully", "success");
+  const toggleIntegration = (id: string) => {
+    const integ = integrations.find(i => i.id === id);
+    setIntegrations(ints => ints.map(i => i.id === id ? { ...i, connected: !i.connected } : i));
+    toast(integ?.connected ? `${integ.name} disconnected` : `${integ?.name} connected`, integ?.connected ? "info" : "success");
   };
 
-  const handleSaveNotifs = () => {
-    addToast("Notification preferences saved", "success");
+  const toggleVertical = (id: string) => {
+    const v = verticals.find(v => v.id === id);
+    setVerticals(vs => vs.map(v => v.id === id ? { ...v, active: !v.active } : v));
+    toast(`${v?.name} ${v?.active ? "disabled" : "enabled"}`, v?.active ? "warning" : "success");
   };
 
-  const handleInvite = () => {
-    if (!inviteForm.email.trim() || !inviteForm.email.includes("@")) { addToast("Valid email required", "error"); return; }
-    const nm: TeamMember = {
-      id: `m${Date.now()}`, name: inviteForm.email.split("@")[0], email: inviteForm.email, role: inviteForm.role, status: "pending",
-    };
-    setMembers((p) => [...p, nm]);
-    setInviteOpen(false);
-    setInviteForm({ email: "", role: "Agent" });
-    addToast(`Invite sent to ${inviteForm.email}`, "success");
+  const toggleNotification = (id: string) => {
+    setNotifications(ns => ns.map(n => n.id === id ? { ...n, enabled: !n.enabled } : n));
   };
 
-  const handleConnect = () => {
-    if (!connectForm.apiKey.trim()) { addToast("API key is required", "error"); return; }
-    if (!connectTarget) return;
-    setIntegrations((prev) => prev.map((i) => i.id === connectTarget.id ? { ...i, status: "connected" } : i));
-    setConnectOpen(false);
-    setConnectForm({ apiKey: "", accountId: "" });
-    addToast(`${connectTarget.name} connected successfully`, "success");
-  };
+  const handleSaveAccount = () => toast.success("Account settings saved");
 
-  const handleDisconnect = (id: string) => {
-    setIntegrations((prev) => prev.map((i) => i.id === id ? { ...i, status: "disconnected" } : i));
-    const integration = integrations.find((i) => i.id === id);
-    addToast(`${integration?.name} disconnected`, "info");
-  };
-
-  const handleNewKey = () => {
-    if (!newKeyName.trim()) { addToast("Key name is required", "error"); return; }
-    const nk: ApiKey = {
-      id: `k${Date.now()}`, name: newKeyName,
-      key: `apex_${newKeyName.toLowerCase().replace(/\s+/g, "_")}_sk_${Math.random().toString(36).slice(2, 18)}`,
-      created: new Date().toISOString().slice(0, 10), lastUsed: "Never", visible: true,
-    };
-    setApiKeys((p) => [nk, ...p]);
-    setNewKeyOpen(false);
-    setNewKeyName("");
-    addToast(`API key "${nk.name}" created`, "success");
-  };
-
-  const toggleKeyVisibility = (id: string) => {
-    setApiKeys((prev) => prev.map((k) => k.id === id ? { ...k, visible: !k.visible } : k));
-  };
-
-  const copyKey = (key: string) => {
-    navigator.clipboard.writeText(key).then(() => addToast("API key copied to clipboard", "success"));
-  };
-
-  const deleteKey = (id: string) => {
-    const key = apiKeys.find((k) => k.id === id);
-    setApiKeys((p) => p.filter((k) => k.id !== id));
-    addToast(`Key "${key?.name}" deleted`, "info");
-  };
-
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6">
-      <Toast toasts={toasts} removeToast={removeToast} />
-
-      <div className="mb-6">
+    <div className="p-6 space-y-6">
+      <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-slate-400 text-sm mt-1">Manage your account, team, and integrations</p>
+        <p className="text-slate-400 text-sm mt-0.5">Configure your APEX AI Revenue OS</p>
       </div>
 
-      <div className="flex gap-6">
-        {/* Sidebar Nav */}
-        <div className="w-52 shrink-0">
-          <nav className="space-y-1">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                  activeTab === tab.id
-                    ? "bg-violet-600/20 text-violet-400 border border-violet-500/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
-                }`}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+      <div className="flex gap-1 border-b border-slate-700/50">
+        {TABS.map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn("flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px", activeTab === tab.id ? "text-emerald-400 border-emerald-400" : "text-slate-400 border-transparent hover:text-white")}>
+              <Icon className="w-4 h-4" />{tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* ── Profile ── */}
-          {activeTab === "profile" && (
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
-              <h2 className="text-base font-semibold text-white mb-4">Profile Settings</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: "Full Name", key: "name", placeholder: "Your full name" },
-                  { label: "Email", key: "email", placeholder: "your@email.com" },
-                  { label: "Company", key: "company", placeholder: "Company name" },
-                  { label: "Role", key: "role", placeholder: "Your role" },
-                ].map(({ label, key, placeholder }) => (
-                  <div key={key}>
-                    <label className="block text-sm text-slate-400 mb-1.5">{label}</label>
-                    <input
-                      value={profile[key as keyof typeof profile]}
-                      onChange={(e) => setProfile((p) => ({ ...p, [key]: e.target.value }))}
-                      placeholder={placeholder}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-end pt-2">
-                <button onClick={handleSaveProfile} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
-                  <Save size={15} /> Save Changes
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Team ── */}
-          {activeTab === "team" && (
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
-                <h2 className="text-base font-semibold text-white">Team Members</h2>
-                <button
-                  onClick={() => setInviteOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all"
-                >
-                  <Plus size={15} /> Invite Member
-                </button>
-              </div>
-              <div className="divide-y divide-slate-700/30">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-400 text-sm font-semibold">
-                        {m.name[0]}
+      {activeTab === "integrations" && (
+        <div className="space-y-4">
+          {["CRM", "Advertising", "Email", "Comms", "Data"].map(cat => {
+            const catIntegrations = integrations.filter(i => i.category === cat);
+            return (
+              <div key={cat}>
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{cat}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {catIntegrations.map(integ => (
+                    <Card key={integ.id} className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">{integ.logo}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white">{integ.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{integ.description}</p>
                       </div>
-                      <div>
-                        <div className="text-sm font-medium text-white">{m.name}</div>
-                        <div className="text-xs text-slate-500">{m.email}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-slate-400">{m.role}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs border ${m.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
-                        {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Integrations ── */}
-          {activeTab === "integrations" && (
-            <div className="grid grid-cols-1 gap-4">
-              {integrations.map((intg) => (
-                <div key={intg.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center text-sm font-bold text-white">
-                      {intg.icon}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-white">{intg.name}</div>
-                      <div className="text-xs text-slate-500">{intg.description}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`flex items-center gap-1.5 text-xs ${intg.status === "connected" ? "text-emerald-400" : "text-slate-500"}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${intg.status === "connected" ? "bg-emerald-400" : "bg-slate-600"}`} />
-                      {intg.status === "connected" ? "Connected" : "Disconnected"}
-                    </span>
-                    {intg.status === "connected" ? (
-                      <button
-                        onClick={() => handleDisconnect(intg.id)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs transition-all border border-slate-600/50"
-                      >
-                        Disconnect
+                      <button onClick={() => toggleIntegration(integ.id)} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex-shrink-0", integ.connected ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30" : "bg-slate-700 text-slate-400 border-slate-600 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/30")}>
+                        {integ.connected ? <><Check className="w-3 h-3" />Connected</> : <><Plus className="w-3 h-3" />Connect</>}
                       </button>
-                    ) : (
-                      <button
-                        onClick={() => { setConnectTarget(intg); setConnectForm({ apiKey: "", accountId: "" }); setConnectOpen(true); }}
-                        className="px-3 py-1.5 rounded-lg bg-violet-600/20 text-violet-400 hover:bg-violet-600/30 text-xs transition-all border border-violet-500/20"
-                      >
-                        Connect
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Notifications ── */}
-          {activeTab === "notifications" && (
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
-              <h2 className="text-base font-semibold text-white mb-4">Notification Preferences</h2>
-              <div className="space-y-3">
-                {(Object.entries(notifs) as [keyof typeof notifs, boolean][]).map(([key, val]) => {
-                  const labels: Record<keyof typeof notifs, string> = {
-                    leadAlerts: "New high-score lead alerts",
-                    complianceFlags: "Compliance flags and rejections",
-                    campaignReports: "Daily campaign performance reports",
-                    agentErrors: "Agent error and anomaly alerts",
-                    weeklyDigest: "Weekly revenue digest email",
-                  };
-                  return (
-                    <div key={key} className="flex items-center justify-between py-3 border-b border-slate-700/30 last:border-0">
-                      <span className="text-sm text-slate-300">{labels[key]}</span>
-                      <button
-                        onClick={() => setNotifs((p) => ({ ...p, [key]: !val }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${val ? "bg-violet-600" : "bg-slate-700"}`}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${val ? "translate-x-5" : "translate-x-0"}`} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex justify-end pt-2">
-                <button onClick={handleSaveNotifs} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
-                  <Save size={15} /> Save Preferences
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Security ── */}
-          {activeTab === "security" && (
-            <div className="space-y-4">
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <h2 className="text-base font-semibold text-white mb-4">Password</h2>
-                <div className="space-y-3">
-                  {["Current Password", "New Password", "Confirm New Password"].map((label) => (
-                    <div key={label}>
-                      <label className="block text-sm text-slate-400 mb-1.5">{label}</label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
-                      />
-                    </div>
+                    </Card>
                   ))}
                 </div>
-                <div className="flex justify-end mt-4">
-                  <button
-                    onClick={() => addToast("Password updated successfully", "success")}
-                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all"
-                  >
-                    <Save size={15} /> Update Password
-                  </button>
-                </div>
               </div>
-
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-white">Two-Factor Authentication</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Add an extra layer of security to your account</div>
-                  </div>
-                  <button
-                    onClick={() => addToast("2FA setup — coming soon", "info")}
-                    className="px-4 py-2 rounded-lg bg-slate-700/50 text-slate-300 hover:text-white text-sm transition-all border border-slate-600/50"
-                  >
-                    Enable 2FA
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── API Keys ── */}
-          {activeTab === "api" && (
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
-                <div>
-                  <h2 className="text-base font-semibold text-white">API Keys</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Keep these secret — they grant full API access</p>
-                </div>
-                <button
-                  onClick={() => { setNewKeyName(""); setNewKeyOpen(true); }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all"
-                >
-                  <Plus size={15} /> New Key
-                </button>
-              </div>
-              <div className="divide-y divide-slate-700/30">
-                {apiKeys.map((k) => (
-                  <div key={k.id} className="px-6 py-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm font-medium text-white">{k.name}</div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => copyKey(k.key)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-all"><Copy size={13} /></button>
-                        <button onClick={() => toggleKeyVisibility(k.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-all">
-                          {k.visible ? <EyeOff size={13} /> : <Eye size={13} />}
-                        </button>
-                        <button onClick={() => deleteKey(k.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
-                      </div>
-                    </div>
-                    <div className="font-mono text-xs text-slate-400 bg-slate-900/50 rounded-lg px-3 py-2 border border-slate-700/30">
-                      {k.visible ? k.key : k.key.slice(0, 12) + "••••••••••••••••••••"}
-                    </div>
-                    <div className="flex gap-4 mt-2 text-xs text-slate-600">
-                      <span>Created: {k.created}</span>
-                      <span>Last used: {k.lastUsed}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })}
         </div>
-      </div>
+      )}
 
-      {/* ── Invite Modal ─────────────────────────────────────────────────────── */}
-      <Modal open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite Team Member">
-        <div className="space-y-4">
+      {activeTab === "verticals" && (
+        <div className="space-y-3">
+          {verticals.map(v => (
+            <Card key={v.id} className="p-4 flex items-center gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-medium text-white">{v.name}</p>
+                  {!v.active && <span className="text-xs text-slate-500">(inactive)</span>}
+                </div>
+                <p className="text-xs text-slate-500">{v.leads.toLocaleString()} leads · {v.ruleCount} compliance rules</p>
+              </div>
+              <button onClick={() => toggleVertical(v.id)} className={cn("w-10 h-5 rounded-full transition-colors relative flex-shrink-0", v.active ? "bg-emerald-500" : "bg-slate-600")}>
+                <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all shadow", v.active ? "left-5" : "left-0.5")} />
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {activeTab === "account" && (
+        <Card className="p-6 max-w-lg space-y-4">
+          {[
+            { label: "Full Name", key: "name" as const },
+            { label: "Email", key: "email" as const },
+            { label: "Company", key: "company" as const },
+          ].map(field => (
+            <div key={field.key}>
+              <label className="text-xs text-slate-400 mb-1.5 block">{field.label}</label>
+              <input value={account[field.key]} onChange={e => setAccount(a => ({ ...a, [field.key]: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+            </div>
+          ))}
           <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Email Address <span className="text-red-400">*</span></label>
-            <input
-              value={inviteForm.email}
-              onChange={(e) => setInviteForm((p) => ({ ...p, email: e.target.value }))}
-              type="email"
-              placeholder="colleague@selectquote.com"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Role</label>
-            <select
-              value={inviteForm.role}
-              onChange={(e) => setInviteForm((p) => ({ ...p, role: e.target.value }))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
-            >
-              {["Admin", "Analyst", "Agent", "Read Only"].map((r) => <option key={r}>{r}</option>)}
+            <label className="text-xs text-slate-400 mb-1.5 block">Timezone</label>
+            <select value={account.timezone} onChange={e => setAccount(a => ({ ...a, timezone: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500/50">
+              {["America/Chicago", "America/New_York", "America/Denver", "America/Los_Angeles"].map(tz => <option key={tz}>{tz}</option>)}
             </select>
           </div>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setInviteOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
-            <button onClick={handleInvite} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
-              <Plus size={15} /> Send Invite
-            </button>
-          </div>
-        </div>
-      </Modal>
+          <button onClick={handleSaveAccount} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-medium transition-colors">Save Changes</button>
+        </Card>
+      )}
 
-      {/* ── Connect Integration Modal ─────────────────────────────────────────── */}
-      <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title={`Connect ${connectTarget?.name ?? ""}`}>
-        <div className="space-y-4">
-          <p className="text-sm text-slate-400">{connectTarget?.description}</p>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">API Key / Access Token <span className="text-red-400">*</span></label>
-            <input
-              value={connectForm.apiKey}
-              onChange={(e) => setConnectForm((p) => ({ ...p, apiKey: e.target.value }))}
-              type="password"
-              placeholder="Paste your API key…"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors font-mono"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Account ID (optional)</label>
-            <input
-              value={connectForm.accountId}
-              onChange={(e) => setConnectForm((p) => ({ ...p, accountId: e.target.value }))}
-              placeholder="Your account or workspace ID"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setConnectOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
-            <button onClick={handleConnect} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
-              <Check size={15} /> Connect
+      {activeTab === "team" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-400">{TEAM.length} members</p>
+            <button onClick={() => toast.info("Invite sent")} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm font-medium hover:bg-emerald-500/30 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> Invite Member
             </button>
           </div>
+          {TEAM.map(member => (
+            <Card key={member.id} className="p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-xs font-bold text-violet-400 flex-shrink-0">{member.avatar}</div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">{member.name}</p>
+                <p className="text-xs text-slate-500">{member.email}</p>
+              </div>
+              <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium border", member.status === "active" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border-amber-500/30")}>{member.status}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400 border border-slate-600">{member.role}</span>
+              {member.role !== "Admin" && (
+                <button onClick={() => toast(`${member.name} removed`, "warning")} className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors rounded"><X className="w-3.5 h-3.5" /></button>
+              )}
+            </Card>
+          ))}
         </div>
-      </Modal>
+      )}
 
-      {/* ── New API Key Modal ──────────────────────────────────────────────────── */}
-      <Modal open={newKeyOpen} onClose={() => setNewKeyOpen(false)} title="Create New API Key">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1.5">Key Name <span className="text-red-400">*</span></label>
-            <input
-              value={newKeyName}
-              onChange={(e) => setNewKeyName(e.target.value)}
-              placeholder="e.g. Staging Key, CI/CD Key"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
-          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-            <p className="text-xs text-amber-400">The key will only be shown once. Copy and store it securely before closing this dialog.</p>
-          </div>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setNewKeyOpen(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">Cancel</button>
-            <button onClick={handleNewKey} className="flex items-center gap-2 px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-all">
-              <Key size={15} /> Generate Key
-            </button>
-          </div>
+      {activeTab === "notifications" && (
+        <div className="space-y-3 max-w-xl">
+          {notifications.map(n => (
+            <Card key={n.id} className="p-4 flex items-start gap-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">{n.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{n.description}</p>
+              </div>
+              <button onClick={() => toggleNotification(n.id)} className={cn("mt-0.5 w-9 h-5 rounded-full transition-colors relative flex-shrink-0", n.enabled ? "bg-emerald-500" : "bg-slate-600")}>
+                <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all shadow", n.enabled ? "left-4" : "left-0.5")} />
+              </button>
+            </Card>
+          ))}
         </div>
-      </Modal>
+      )}
     </div>
   );
 }

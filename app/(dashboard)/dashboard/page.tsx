@@ -1,229 +1,208 @@
 "use client";
+import { useState } from "react";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { DollarSign, Users, TrendingUp, Zap, Target, Activity } from "lucide-react";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import StatusDot from "@/components/ui/StatusDot";
-import TopBar from "@/components/layout/TopBar";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar,
-} from "recharts";
-import ChartTooltip from "@/components/ui/ChartTooltip";
+import { ChartTooltip } from "@/components/ui/ChartTooltip";
+import { cn } from "@/lib/utils";
 
-// ── Mock Data ────────────────────────────────────────────────────────────────
-const stats = {
-  totalLeads: 2130, leadsChange: 12.4,
-  activeCampaigns: 3, campaignsChange: 0,
-  revenueMtd: 64700, revenueChange: 18.2,
-  conversionRate: 0.047, conversionChange: 3.1,
-  appointmentsSet: 187, appointmentsChange: 8.6,
-  activeAgents: 4, agentsChange: 0,
-};
+const revenueData = [
+  { month: "Oct", pipeline: 1200000, closed: 820000 },
+  { month: "Nov", pipeline: 1450000, closed: 940000 },
+  { month: "Dec", pipeline: 1100000, closed: 780000 },
+  { month: "Jan", pipeline: 1680000, closed: 1100000 },
+  { month: "Feb", pipeline: 1920000, closed: 1380000 },
+  { month: "Mar", pipeline: 2100000, closed: 1620000 },
+];
+
+const conversionData = [
+  { stage: "Leads", value: 4820 },
+  { stage: "Qualified", value: 2310 },
+  { stage: "Proposal", value: 980 },
+  { stage: "Negotiation", value: 420 },
+  { stage: "Closed", value: 187 },
+];
 
 const recentLeads = [
-  { id: "l1", firstName: "Margaret", lastName: "Thompson", vertical: "Medicare", status: "NEW", score: 94, createdAt: "2025-07-14T09:30:00Z" },
-  { id: "l2", firstName: "Robert", lastName: "Kincaid", vertical: "Medicare", status: "CONTACTED", score: 88, createdAt: "2025-07-14T08:15:00Z" },
-  { id: "l3", firstName: "Sandra", lastName: "Williams", vertical: "ACA", status: "QUALIFIED", score: 61, createdAt: "2025-07-13T14:20:00Z" },
-  { id: "l4", firstName: "James", lastName: "Okonkwo", vertical: "Life Insurance", status: "CONTACTED", score: 79, createdAt: "2025-07-13T11:00:00Z" },
-  { id: "l5", firstName: "Patricia", lastName: "Nguyen", vertical: "Final Expense", status: "QUALIFIED", score: 72, createdAt: "2025-07-12T16:45:00Z" },
-];
-
-const revenueChart = [
-  { date: "Jan", revenue: 28000 }, { date: "Feb", revenue: 32000 },
-  { date: "Mar", revenue: 38000 }, { date: "Apr", revenue: 35000 },
-  { date: "May", revenue: 42000 }, { date: "Jun", revenue: 52000 },
-  { date: "Jul", revenue: 64700 },
-];
-
-const conversionChart = [
-  { vertical: "Medicare", conversions: 420 },
-  { vertical: "ACA", conversions: 310 },
-  { vertical: "Life", conversions: 185 },
-  { vertical: "Final Exp", conversions: 145 },
-  { vertical: "Dental", conversions: 90 },
+  { id: 1, name: "Margaret Chen", vertical: "Medicare", score: 94, status: "hot", value: "$3,200", agent: "ORACLE" },
+  { id: 2, name: "Robert Williams", vertical: "Auto", score: 82, status: "warm", value: "$1,800", agent: "SIGNAL" },
+  { id: 3, name: "Patricia Davis", vertical: "Medicare", score: 91, status: "hot", value: "$4,100", agent: "ORACLE" },
+  { id: 4, name: "James Thompson", vertical: "Home", score: 67, status: "warm", value: "$2,400", agent: "CONVERT" },
+  { id: 5, name: "Linda Garcia", vertical: "Life", score: 45, status: "cold", value: "$1,200", agent: "REACH" },
+  { id: 6, name: "Michael Brown", vertical: "Medicare", score: 88, status: "hot", value: "$3,900", agent: "ORACLE" },
 ];
 
 const topCampaigns = [
-  { id: "c1", name: "Q3 Medicare Advantage Push", budget: 50000, spent: 32400 },
-  { id: "c2", name: "Final Expense Spring Drive", budget: 25000, spent: 24100 },
-  { id: "c3", name: "ACA Open Enrollment 2025", budget: 75000, spent: 8200 },
+  { name: "Medicare AEP Q1", progress: 84, spend: "$24,200", pipeline: "$312,000", color: "bg-emerald-500" },
+  { name: "Auto Cross-sell", progress: 61, spend: "$12,800", pipeline: "$98,400", color: "bg-violet-500" },
+  { name: "Life Insurance Push", progress: 47, spend: "$8,400", pipeline: "$67,200", color: "bg-amber-500" },
+  { name: "Home Bundle Q2", progress: 29, spend: "$5,100", pipeline: "$38,800", color: "bg-blue-500" },
 ];
 
 const agentActivity = [
-  { id: "a1", name: "LeadScorer", type: "Lead Intelligence", status: "active" as const },
-  { id: "a2", name: "CampaignOptimizer", type: "Media & Spend", status: "active" as const },
-  { id: "a3", name: "ComplianceGuardian", type: "Regulatory & Legal", status: "active" as const },
-  { id: "a4", name: "AnalyticsEngine", type: "Insights & Reporting", status: "active" as const },
-];
-
-const metricCards = [
-  { label: "Total Leads", value: stats.totalLeads.toLocaleString(), change: stats.leadsChange, color: "violet" },
-  { label: "Active Campaigns", value: stats.activeCampaigns.toLocaleString(), change: stats.campaignsChange, color: "blue" },
-  { label: "Revenue (MTD)", value: `$${(stats.revenueMtd / 1000).toFixed(1)}k`, change: stats.revenueChange, color: "emerald" },
-  { label: "Conversion Rate", value: `${(stats.conversionRate * 100).toFixed(1)}%`, change: stats.conversionChange, color: "amber" },
-  { label: "Appointments Set", value: stats.appointmentsSet.toLocaleString(), change: stats.appointmentsChange, color: "indigo" },
-  { label: "AI Agents Active", value: stats.activeAgents.toLocaleString(), change: stats.agentsChange, color: "rose" },
+  { agent: "ORACLE", action: "Scored 14 new Medicare leads", time: "2m ago", status: "running" },
+  { agent: "ARCHITECT", action: "Rebuilt campaign targeting model", time: "8m ago", status: "running" },
+  { agent: "CREATOR", action: "Generated 6 ad variants for AEP", time: "15m ago", status: "running" },
+  { agent: "SIGNAL", action: "Detected intent signal: retirement search", time: "22m ago", status: "running" },
+  { agent: "REACH", action: "Launched email sequence to 2,400 contacts", time: "31m ago", status: "idle" },
+  { agent: "CONVERT", action: "Personalized 3 proposal PDFs", time: "44m ago", status: "idle" },
+  { agent: "LOOP", action: "Attribution report updated", time: "1h ago", status: "idle" },
 ];
 
 const statusColors: Record<string, string> = {
-  NEW: "bg-slate-500/20 text-slate-300",
-  CONTACTED: "bg-blue-500/20 text-blue-300",
-  QUALIFIED: "bg-violet-500/20 text-violet-300",
-  APPOINTMENT_SET: "bg-amber-500/20 text-amber-300",
-  WON: "bg-emerald-500/20 text-emerald-300",
-  LOST: "bg-red-500/20 text-red-300",
+  hot: "bg-rose-500/20 text-rose-400 border border-rose-500/30",
+  warm: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
+  cold: "bg-blue-500/20 text-blue-400 border border-blue-500/30",
 };
 
 export default function DashboardPage() {
+  const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
+
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950">
-      <TopBar title="Dashboard" />
-      <main className="flex-1 p-6 space-y-6">
-        {/* Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          {metricCards.map((card) => (
-            <MetricCard key={card.label} label={card.label} value={card.value} change={card.change} color={card.color} />
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Revenue Dashboard</h1>
+          <p className="text-slate-400 text-sm mt-0.5">Real-time pipeline powered by 7 AI agents</p>
+        </div>
+        <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-700/50 rounded-lg p-1">
+          {(["7d", "30d", "90d"] as const).map(r => (
+            <button key={r} onClick={() => setRange(r)} className={cn("px-3 py-1.5 text-sm rounded-md font-medium transition-all", range === r ? "bg-emerald-500 text-white" : "text-slate-400 hover:text-white")}>
+              {r}
+            </button>
           ))}
         </div>
+      </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <Card>
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-white">Revenue Over Time</h2>
-                <Badge className="bg-emerald-500/20 text-emerald-300">MTD</Badge>
-              </div>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueChart}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
-                    <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b98120" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </Card>
-          <Card>
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-white">Conversions by Vertical</h2>
-                <Badge className="bg-violet-500/20 text-violet-300">30d</Badge>
-              </div>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={conversionChart}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="vertical" stroke="#64748b" fontSize={12} />
-                    <YAxis stroke="#64748b" fontSize={12} />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="conversions" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </Card>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <MetricCard title="Total Pipeline" value="$2.1M" change={18.4} changeLabel="vs last month" icon={<DollarSign className="w-4 h-4" />} accent="emerald" />
+        <MetricCard title="Closed Revenue" value="$1.62M" change={12.7} changeLabel="vs last month" icon={<TrendingUp className="w-4 h-4" />} accent="emerald" />
+        <MetricCard title="Active Leads" value="4,820" change={-3.2} changeLabel="vs last month" icon={<Users className="w-4 h-4" />} accent="violet" />
+        <MetricCard title="Conversion Rate" value="3.9%" change={0.8} changeLabel="vs last month" icon={<Target className="w-4 h-4" />} accent="amber" />
+        <MetricCard title="Agent Actions" value="12,840" change={24.1} changeLabel="vs last month" icon={<Zap className="w-4 h-4" />} accent="blue" />
+        <MetricCard title="Cost per Lead" value="$14.20" change={-8.3} changeLabel="vs last month" icon={<Activity className="w-4 h-4" />} accent="rose" />
+      </div>
 
-        {/* Bottom Row */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {/* Recent Leads */}
-          <Card className="xl:col-span-2">
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-white">Recent Leads</h2>
-                <a href="/leads" className="text-xs text-emerald-400 hover:text-emerald-300">View all \u2192</a>
-              </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-slate-500 text-xs uppercase">
-                    {["Name", "Vertical", "Status", "Score", "Created"].map((h) => (
-                      <th key={h} className="px-4 py-2 text-left font-medium">{h}</th>
-                    ))}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Card className="xl:col-span-2 p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Revenue Overview</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={revenueData}>
+              <defs>
+                <linearGradient id="pipeline" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="closed" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+              <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000000).toFixed(1)}M`} />
+              <Tooltip content={<ChartTooltip />} />
+              <Area type="monotone" dataKey="pipeline" stroke="#8b5cf6" strokeWidth={2} fill="url(#pipeline)" name="Pipeline" />
+              <Area type="monotone" dataKey="closed" stroke="#10b981" strokeWidth={2} fill="url(#closed)" name="Closed" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Conversion Funnel</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={conversionData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+              <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="stage" tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} width={80} />
+              <Tooltip content={<ChartTooltip />} />
+              <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} name="Count" />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Card className="xl:col-span-2 p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Recent Leads</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-700/50">
+                  {["Name", "Vertical", "Score", "Status", "Value", "Agent"].map(h => (
+                    <th key={h} className="text-left pb-2 text-xs font-medium text-slate-500">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/30">
+                {recentLeads.map(lead => (
+                  <tr key={lead.id} className="hover:bg-slate-700/20 transition-colors">
+                    <td className="py-2.5 text-sm text-white font-medium">{lead.name}</td>
+                    <td className="py-2.5 text-sm text-slate-400">{lead.vertical}</td>
+                    <td className="py-2.5">
+                      <span className={cn("text-sm font-bold", lead.score >= 85 ? "text-emerald-400" : lead.score >= 65 ? "text-amber-400" : "text-slate-400")}>
+                        {lead.score}
+                      </span>
+                    </td>
+                    <td className="py-2.5">
+                      <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium capitalize", statusColors[lead.status])}>
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-sm text-white">{lead.value}</td>
+                    <td className="py-2.5">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30 font-medium">
+                        {lead.agent}
+                      </span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {recentLeads.map((lead) => (
-                    <tr key={lead.id} className="border-t border-slate-800/50 hover:bg-slate-800/30">
-                      <td className="px-4 py-3 text-white">{lead.firstName} {lead.lastName}</td>
-                      <td className="px-4 py-3 text-slate-400">{lead.vertical}</td>
-                      <td className="px-4 py-3">
-                        <Badge className={statusColors[lead.status] ?? "bg-slate-500/20 text-slate-300"}>
-                          {lead.status.replace(/_/g, " ")}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${lead.score >= 80 ? "bg-emerald-500" : lead.score >= 60 ? "bg-amber-500" : "bg-red-500"}`}
-                              style={{ width: `${lead.score}%` }}
-                            />
-                          </div>
-                          <span className="text-slate-300 text-xs">{lead.score}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-400 text-xs">
-                        {new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">Top Campaigns</h3>
+            <div className="space-y-4">
+              {topCampaigns.map(c => (
+                <div key={c.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-white font-medium">{c.name}</span>
+                    <span className="text-xs text-slate-400">{c.progress}%</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div className={cn("h-full rounded-full", c.color)} style={{ width: `${c.progress}%` }} />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-xs text-slate-500">Spend: {c.spend}</span>
+                    <span className="text-xs text-emerald-400">{c.pipeline}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 
-          {/* Right Column */}
-          <div className="space-y-4">
-            {/* Top Campaigns */}
-            <Card>
-              <div className="p-5">
-                <h2 className="text-sm font-semibold text-white mb-4">Top Campaigns</h2>
-                <div className="space-y-3">
-                  {topCampaigns.map((c) => {
-                    const pct = c.budget > 0 ? Math.min(100, (c.spent / c.budget) * 100) : 0;
-                    return (
-                      <div key={c.id} className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-300 truncate">{c.name}</span>
-                          <span className="text-slate-500">{pct.toFixed(0)}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-3">Agent Activity</h3>
+            <div className="space-y-2.5">
+              {agentActivity.map((a, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <div className={cn("mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0", a.status === "running" ? "bg-emerald-400" : "bg-slate-600")} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-white font-medium truncate">
+                      <span className="text-violet-400">{a.agent}</span> — {a.action}
+                    </p>
+                    <p className="text-xs text-slate-500">{a.time}</p>
+                  </div>
                 </div>
-              </div>
-            </Card>
-
-            {/* Agent Activity */}
-            <Card>
-              <div className="p-5">
-                <h2 className="text-sm font-semibold text-white mb-4">Agent Activity</h2>
-                <div className="space-y-3">
-                  {agentActivity.map((agent) => (
-                    <div key={agent.id} className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
-                        <span className="text-violet-400 text-xs font-bold">{agent.name[0]}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white truncate">{agent.name}</p>
-                        <p className="text-xs text-slate-500">{agent.type}</p>
-                      </div>
-                      <StatusDot status={agent.status} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          </div>
+              ))}
+            </div>
+          </Card>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
