@@ -106,10 +106,7 @@ const STATUSES = ["ALL", "ACTIVE", "PAUSED", "DRAFT", "COMPLETED", "ARCHIVED"];
 const TYPES = ["ALL", "OUTBOUND", "INBOUND", "RETARGETING", "NURTURE"];
 const VERTICALS = ["SOLAR", "INSURANCE", "MORTGAGE", "LEGAL", "AUTO", "HOME_SERVICES"];
 
-const statusConfig: Record
-  string,
-  { badge: string; dot: string; label: string }
-> = {
+const statusConfig: Record<string, { badge: string; dot: string; label: string }> = {
   ACTIVE: {
     badge: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
     dot: "bg-emerald-400",
@@ -153,10 +150,7 @@ const verticalColors: Record<string, string> = {
   HOME_SERVICES: "text-teal-400",
 };
 
-const experimentStatusConfig: Record
-  string,
-  { badge: string; label: string }
-> = {
+const experimentStatusConfig: Record<string, { badge: string; label: string }> = {
   RUNNING: {
     badge: "bg-blue-500/20 text-blue-300 border-blue-500/30",
     label: "Running",
