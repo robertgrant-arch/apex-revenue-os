@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import ToastProvider from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
   title: "APEX — AI Revenue Operating System",
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="bg-slate-950 text-white antialiased">
         <Providers>{children}</Providers>
+                  <ToastProvider />
       </body>
     </html>
   );
