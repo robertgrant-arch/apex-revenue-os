@@ -52,10 +52,7 @@ const AGENT_TYPES = [
 
 const AGENT_STATUSES = ["ALL", "ACTIVE", "IDLE", "PAUSED", "ERROR", "OFFLINE"];
 
-const statusConfig: Record
-  string,
-  { badge: string; dot: string; label: string; ring: string }
-> = {
+const statusConfig: Record<string, { badge: string; dot: string; label: string; ring: string }> = {
   ACTIVE: {
     badge: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
     dot: "bg-emerald-400",
