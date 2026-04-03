@@ -164,7 +164,7 @@ export default function DashboardPage() {
     },
   ];
 
-  const statusColors: Record<string, string> = {
+    const statusColors: { [key: string]: string } = {
     NEW: "bg-slate-500/20 text-slate-300",
     CONTACTED: "bg-blue-500/20 text-blue-300",
     QUALIFIED: "bg-violet-500/20 text-violet-300",
