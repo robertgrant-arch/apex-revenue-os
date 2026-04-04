@@ -35,6 +35,7 @@ Return a JSON object with exactly these fields:
   "predictedCTR": a number between 1.5 and 6.5 representing predicted click-through rate percentage
 }`;
 
+    // Step 1: Generate ad copy with GPT
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -74,11 +75,42 @@ Return a JSON object with exactly these fields:
       );
     }
 
+    // Step 2: Generate image with DALL-E using the imageDescription
+    let imageUrl: string | undefined;
+    try {
+      const imagePrompt = `Professional insurance advertisement image: ${creative.imageDescription}. Clean, modern, high-quality, photorealistic.`;
+      const dalleResponse = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "dall-e-3",
+          prompt: imagePrompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "b64_json",
+        }),
+      });
+
+      if (dalleResponse.ok) {
+        const dalleData = await dalleResponse.json();
+        const b64 = dalleData.data?.[0]?.b64_json;
+        if (b64) {
+          imageUrl = `data:image/png;base64,${b64}`;
+        }
+      }
+    } catch {
+      // Image generation failed, continue without image
+    }
+
     return NextResponse.json({
       id: `gen-${Date.now()}`,
       vertical,
       type,
       ...creative,
+      imageUrl,
       status: "active",
       impressions: 0,
       clicks: 0,
