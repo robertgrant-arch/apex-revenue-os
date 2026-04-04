@@ -164,6 +164,7 @@ export default function CreativePage() {
   // Generate form state
   const [genVertical, setGenVertical] = useState<Vertical>("Medicare");
   const [genType, setGenType]         = useState<AdType>("image");
+    const [genPrompt, setGenPrompt] = useState("");
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -186,7 +187,7 @@ export default function CreativePage() {
       const res = await fetch("/api/generate-creative", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vertical: genVertical, type: genType }),
+        body: JSON.stringify({ vertical: genVertical, type: genType, prompt: genPrompt }),
       });
       if (!res.ok) throw new Error("API error");
 
@@ -204,12 +205,13 @@ export default function CreativePage() {
       const updated = [creative, ...creatives];
       persist(updated);
       setShowGenModal(false);
+            setGenPrompt("");
     } catch (err) {
       console.error("Generate failed:", err);
     } finally {
       setGenerating(false);
     }
-  }, [genVertical, genType, creatives, persist]);
+  }, [genVertical, genType, genPrompt, creatives, persist]);
 
   // -------------------------------------------------------------------------
   // Delete
@@ -436,6 +438,17 @@ export default function CreativePage() {
                     </button>
                   ))}
                 </div>
+
+                              <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wide mb-2 block">Description (optional)</label>
+                <textarea
+                  value={genPrompt}
+                  onChange={(e) => setGenPrompt(e.target.value)}
+                  placeholder="Describe what you want the creative to accomplish…"
+                  rows={3}
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none"
+                />
+              </div>
               </div>
             </div>
 
