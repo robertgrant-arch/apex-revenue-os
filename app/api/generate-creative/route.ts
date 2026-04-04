@@ -75,10 +75,11 @@ Return a JSON object with exactly these fields:
       );
     }
 
-    // Step 2: Generate hyper-realistic image with GPT Image 1
+    // Step 2: Generate image with DALL-E 3 (smaller response than gpt-image-1)
     let imageUrl: string | undefined;
     try {
-      const imagePrompt = `Hyper-realistic professional stock photograph: ${creative.imageDescription}. CRITICAL: Do NOT include any text, words, letters, numbers, logos, watermarks, or typography anywhere in the image. The image must contain ONLY the visual scene with zero text elements. Ultra high quality, photorealistic, natural lighting, shallow depth of field, editorial photography style, shot on Canon EOS R5.`;
+      const imagePrompt = `Hyper-realistic professional stock photograph: ${creative.imageDescription}. CRITICAL: Do NOT include any text, words, letters, numbers, logos, watermarks, or typography anywhere in the image. The image must contain ONLY the visual scene with zero text elements. Ultra high quality, photorealistic, natural lighting, shallow depth of field, editorial photography style.`;
+
       const imgResponse = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
@@ -86,11 +87,12 @@ Return a JSON object with exactly these fields:
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-image-1",
+          model: "dall-e-3",
           prompt: imagePrompt,
           n: 1,
           size: "1024x1024",
-          quality: "low",
+          quality: "standard",
+          response_format: "b64_json",
         }),
       });
 
