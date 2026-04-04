@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Card from "@/components/ui/Card";
 import { ChartTooltip } from "@/components/ui/ChartTooltip";
@@ -15,7 +14,7 @@ interface Creative {
   id: string; vertical: string; type: AdType; headline: string; body: string;
   cta: string; imageDescription: string; predictedCTR: number;
   actualCTR: number | null; impressions: number; clicks: number;
-  status: Status; createdAt: string; generated?: boolean;
+  status: Status; createdAt: string; generated?: boolean; imageUrl?: string;
 }
 
 const KEY = "creatives";
@@ -26,6 +25,98 @@ const TYPE_COLORS: Record<string, string> = { image: "bg-emerald-500/20 text-eme
 const STATUS_COLORS: Record<string, string> = { active: "bg-emerald-500/20 text-emerald-400", paused: "bg-amber-500/20 text-amber-400", draft: "bg-slate-500/20 text-slate-400" };
 
 function fmt(n: number) { return n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}K` : String(n); }
+
+function CreativeDetailModal({ creative: c, onClose }: { creative: Creative; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl">
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-700/50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-blue-400">{c.vertical}</span>
+            <span className={cn("text-xs px-2 py-0.5 rounded-full", TYPE_COLORS[c.type])}>{c.type}</span>
+            {c.generated && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400">AI</span>}
+            <span className={cn("text-xs px-2 py-0.5 rounded-full", STATUS_COLORS[c.status])}>{c.status}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white text-xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Image or placeholder */}
+          <div className="w-full rounded-xl overflow-hidden border border-slate-700/50">
+            {c.imageUrl ? (
+              <img src={c.imageUrl} alt={c.headline} className="w-full h-64 object-cover" />
+            ) : (
+              <div className="w-full h-48 bg-slate-800 flex flex-col items-center justify-center gap-3 px-6 text-center">
+                <div className="text-3xl">🖼️</div>
+                <p className="text-sm text-slate-400 italic">{c.imageDescription}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Copy */}
+          <div className="space-y-4">
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Headline</div>
+              <p className="text-white font-semibold text-base leading-snug">{c.headline}</p>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Body Copy</div>
+              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{c.body}</p>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Call to Action</div>
+              <span className="inline-block px-3 py-1.5 bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-sm rounded-lg font-medium">
+                {c.cta}
+              </span>
+            </div>
+          </div>
+
+          {/* Image description (always shown in detail) */}
+          <div>
+            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Image Description</div>
+            <p className="text-slate-400 text-sm italic leading-relaxed">{c.imageDescription}</p>
+          </div>
+
+          {/* Performance stats */}
+          <div>
+            <div className="text-xs text-slate-500 uppercase tracking-wide mb-3">Performance</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Impressions", value: fmt(c.impressions), color: "text-blue-400" },
+                { label: "Clicks", value: fmt(c.clicks), color: "text-white" },
+                { label: "Predicted CTR", value: `${c.predictedCTR.toFixed(2)}%`, color: "text-violet-400" },
+                { label: "Actual CTR", value: c.actualCTR !== null ? `${c.actualCTR.toFixed(2)}%` : "—", color: "text-emerald-400" },
+              ].map(s => (
+                <div key={s.label} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
+                  <div className="text-xs text-slate-500 mb-1">{s.label}</div>
+                  <div className={cn("text-lg font-bold", s.color)}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Created date */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+            <div className="text-xs text-slate-500">
+              Created{" "}
+              <span className="text-slate-400">
+                {new Date(c.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+            <div className="text-xs text-slate-600">ID: {c.id}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function GenerateModal({ onClose, onGenerated }: { onClose: () => void; onGenerated: (c: Creative) => void }) {
   const [vertical, setVertical] = useState<Vertical>("Medicare");
@@ -82,6 +173,7 @@ export default function CreativePage() {
   const [typeFilter, setTypeFilter] = useState<AdType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const [showModal, setShowModal] = useState(false);
+  const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null);
 
   const load = useCallback(() => setCreatives(store.getAll<Creative>(KEY)), []);
   useEffect(() => { load(); }, [load]);
@@ -118,7 +210,6 @@ export default function CreativePage() {
           <div><h1 className="text-2xl font-bold">Creative Studio</h1><p className="text-slate-400 text-sm mt-1">Manage and generate AI-powered ad creatives</p></div>
           <button onClick={() => setShowModal(true)} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold">Generate Creative</button>
         </div>
-
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[{ l: "Total Impressions", v: fmt(stats.ti), c: "text-blue-400" }, { l: "Total Clicks", v: fmt(stats.tc), c: "text-emerald-400" }, { l: "Avg Predicted CTR", v: `${stats.ap.toFixed(2)}%`, c: "text-violet-400" }, { l: "Avg Actual CTR", v: `${stats.aa.toFixed(2)}%`, c: "text-amber-400" }].map(s => (
             <Card key={s.l} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
@@ -127,7 +218,6 @@ export default function CreativePage() {
             </Card>
           ))}
         </div>
-
         {chartData.length > 0 && (
           <Card className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-white mb-4">Predicted vs Actual CTR</h3>
@@ -141,7 +231,6 @@ export default function CreativePage() {
             </ResponsiveContainer>
           </Card>
         )}
-
         <div className="flex flex-col sm:flex-row gap-3">
           <input type="text" placeholder="Search creatives..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-4 py-2.5 text-sm placeholder-slate-500" />
           <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as AdType | "all")} className="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2.5 text-sm">
@@ -151,20 +240,28 @@ export default function CreativePage() {
             <option value="all">All Status</option>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
-
         {filtered.length === 0 ? (
-          <div className="text-center py-16"><div className="text-4xl mb-4">&#x1f3a8;</div><h3 className="text-lg font-semibold text-white mb-2">No creatives yet</h3><p className="text-slate-400 text-sm">Click Generate Creative to create your first AI-powered ad.</p></div>
+          <div className="text-center py-16"><div className="text-4xl mb-4">🎨</div><h3 className="text-lg font-semibold text-white mb-2">No creatives yet</h3><p className="text-slate-400 text-sm">Click Generate Creative to create your first AI-powered ad.</p></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map(c => (
-              <div key={c.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 flex flex-col gap-3">
+              <div
+                key={c.id}
+                onClick={() => setSelectedCreative(c)}
+                className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 flex flex-col gap-3 cursor-pointer hover:border-emerald-500/30 transition-all"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-medium text-blue-400">{c.vertical}</span>
                     <span className={cn("text-xs px-2 py-0.5 rounded-full", TYPE_COLORS[c.type])}>{c.type}</span>
                     {c.generated && <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400">AI</span>}
                   </div>
-                  <select value={c.status} onChange={e => handleStatus(c.id, e.target.value as Status)} className="text-xs bg-slate-700 border-none text-slate-300 rounded px-1 py-0.5">
+                  <select
+                    value={c.status}
+                    onClick={e => e.stopPropagation()}
+                    onChange={e => { e.stopPropagation(); handleStatus(c.id, e.target.value as Status); }}
+                    className="text-xs bg-slate-700 border-none text-slate-300 rounded px-1 py-0.5"
+                  >
                     {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
@@ -176,13 +273,18 @@ export default function CreativePage() {
                   <div><div className="text-slate-500">Pred. CTR</div><div className="font-semibold text-violet-400">{c.predictedCTR.toFixed(1)}%</div></div>
                   <div><div className="text-slate-500">Actual CTR</div><div className="font-semibold text-emerald-400">{c.actualCTR !== null ? `${c.actualCTR.toFixed(1)}%` : "--"}</div></div>
                 </div>
-                <button onClick={() => handleDelete(c.id)} className="text-xs text-red-400 hover:text-red-300 self-end mt-1">Delete</button>
+                <button
+                  onClick={e => { e.stopPropagation(); handleDelete(c.id); }}
+                  className="text-xs text-red-400 hover:text-red-300 self-end mt-1"
+                >
+                  Delete
+                </button>
               </div>
             ))}
           </div>
         )}
-
         {showModal && <GenerateModal onClose={() => setShowModal(false)} onGenerated={() => load()} />}
+        {selectedCreative && <CreativeDetailModal creative={selectedCreative} onClose={() => setSelectedCreative(null)} />}
       </div>
     </div>
   );
