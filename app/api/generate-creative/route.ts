@@ -90,15 +90,15 @@ Return a JSON object with exactly these fields:
           prompt: imagePrompt,
           n: 1,
           size: "1024x1024",
-          response_format: "b64_json",
+          response_format: "url",
         }),
       });
 
       if (dalleResponse.ok) {
         const dalleData = await dalleResponse.json();
-        const b64 = dalleData.data?.[0]?.b64_json;
-        if (b64) {
-          imageUrl = `data:image/png;base64,${b64}`;
+        const url = dalleData.data?.[0]?.url;
+        if (url) {
+          imageUrl = url;
         }
       }
     } catch {
