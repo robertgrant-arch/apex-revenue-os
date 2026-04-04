@@ -31,7 +31,7 @@ Return a JSON object with exactly these fields:
   "headline": "compelling headline under 10 words",
   "body": "body copy 2-3 sentences, benefit-focused, compliant",
   "cta": "CTA button text, 2-5 words",
-  "imageDescription": "detailed visual description for the creative, 1-2 sentences",
+  "imageDescription": "detailed visual description of ONLY the scene and people, NO text or words should appear in the image. Describe the setting, people, lighting, and mood only.",
   "predictedCTR": a number between 1.5 and 6.5 representing predicted click-through rate percentage
 }`;
 
@@ -78,7 +78,7 @@ Return a JSON object with exactly these fields:
     // Step 2: Generate hyper-realistic image with GPT Image 1
     let imageUrl: string | undefined;
     try {
-      const imagePrompt = `Hyper-realistic professional photograph for an insurance advertisement: ${creative.imageDescription}. Ultra high quality, photorealistic, natural lighting, editorial photography style.`;
+      const imagePrompt = `Hyper-realistic professional stock photograph: ${creative.imageDescription}. CRITICAL: Do NOT include any text, words, letters, numbers, logos, watermarks, or typography anywhere in the image. The image must contain ONLY the visual scene with zero text elements. Ultra high quality, photorealistic, natural lighting, shallow depth of field, editorial photography style, shot on Canon EOS R5.`;
       const imgResponse = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
