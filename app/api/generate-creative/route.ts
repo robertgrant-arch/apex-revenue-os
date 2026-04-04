@@ -75,30 +75,30 @@ Return a JSON object with exactly these fields:
       );
     }
 
-    // Step 2: Generate image with DALL-E using the imageDescription
+    // Step 2: Generate hyper-realistic image with GPT Image 1
     let imageUrl: string | undefined;
     try {
-      const imagePrompt = `Professional insurance advertisement image: ${creative.imageDescription}. Clean, modern, high-quality, photorealistic.`;
-      const dalleResponse = await fetch("https://api.openai.com/v1/images/generations", {
+      const imagePrompt = `Hyper-realistic professional photograph for an insurance advertisement: ${creative.imageDescription}. Ultra high quality, photorealistic, natural lighting, editorial photography style.`;
+      const imgResponse = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "dall-e-3",
+          model: "gpt-image-1",
           prompt: imagePrompt,
           n: 1,
           size: "1024x1024",
-          response_format: "url",
+          quality: "low",
         }),
       });
 
-      if (dalleResponse.ok) {
-        const dalleData = await dalleResponse.json();
-        const url = dalleData.data?.[0]?.url;
-        if (url) {
-          imageUrl = url;
+      if (imgResponse.ok) {
+        const imgData = await imgResponse.json();
+        const b64 = imgData.data?.[0]?.b64_json;
+        if (b64) {
+          imageUrl = `data:image/png;base64,${b64}`;
         }
       }
     } catch {
