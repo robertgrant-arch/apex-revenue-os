@@ -197,6 +197,85 @@ export default function LandingPage() {
           ))}
         </div>
       </div>
+      
+      {/* Marketing Automation Agents - NEW */}
+      <section className="max-w-6xl mx-auto px-6 mb-24">
+        <div className="text-center mb-12">
+          <span className="inline-block bg-purple-500/10 text-purple-400 text-xs font-semibold px-3 py-1 rounded-full mb-4 border border-purple-500/20">NEW — Marketing Suite</span>
+          <h2 className="text-3xl md:text-4xl font-bold mt-4 mb-3">12 Marketing Automation Agents</h2>
+          <p className="text-slate-400 max-w-2xl mx-auto">A simple dashboard where Marketing can set up, manage, train, oversee, and optimize agents for Marketing Automation and Analytics use cases.</p>
+        </div>
+        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[
+            { name: "BRAND GUARD", role: "Brand Consistency", color: "#8b5cf6", desc: "Reviews content to ensure alignment with brand voice, tone, messaging pillars, and style standards at scale." },
+            { name: "TAGGER", role: "Asset Tagging & Knowledge", color: "#f59e0b", desc: "Automatically tags marketing assets by audience, campaign theme, seasonality, and channel for smarter reuse." },
+            { name: "MAILER", role: "Email Builder", color: "#10b981", desc: "Builds email drafts using the design system, approved modules, and compliance-aware messaging via Iterable and Segment." },
+            { name: "PAGER", role: "Landing Page Assembly", color: "#3b82f6", desc: "Builds campaign landing pages using approved templates and content blocks to accelerate launches." },
+            { name: "COMPLIANCE", role: "Compliance Review", color: "#ef4444", desc: "Reviews marketing content and creative against regulatory and internal compliance rules to shorten review cycles." },
+            { name: "ANALYST", role: "Campaign Performance", color: "#06b6d4", desc: "Analyzes campaign results across email, SMS, and web analytics to identify optimization opportunities." },
+            { name: "STRATEGIST", role: "Marketing Briefing", color: "#ec4899", desc: "Converts insights into structured campaign briefs with strategy, audience, and messaging guidance." },
+            { name: "EXPERIMENTER", role: "Experimentation", color: "#6366f1", desc: "Recommends and designs A/B tests across email, landing pages, and paid creative to increase testing velocity." },
+            { name: "SCOUT", role: "Competitive Intelligence", color: "#f97316", desc: "Monitors competitor messaging, offers, advertising, and marketing activity to strengthen positioning." },
+            { name: "FACTORY", role: "Campaign Creative Factory", color: "#a855f7", desc: "Generates full creative packages from a single brief across email, ads, landing pages, and SMS." },
+            { name: "CLOSER", role: "Sales Follow-Up", color: "#22c55e", desc: "Generates follow-up messaging for voicemail, SMS, and email based on best-performing sales patterns." },
+            { name: "RECOVERY", role: "Lead Recovery SMS", color: "#eab308", desc: "Engages uncontacted leads through guardrailed SMS conversations using profile and form context." },
+          ].map(agent => (
+            <div key={agent.name} className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 hover:border-purple-500/30 transition-colors">
+              <div className="font-mono text-sm font-bold mb-1" style={{ color: agent.color }}>{agent.name}</div>
+              <div className="text-xs text-slate-400 mb-2 font-medium">{agent.role}</div>
+              <p className="text-xs text-slate-500 leading-relaxed">{agent.desc.slice(0, 100)}...</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Social Ad Creator - NEW */}
+      <section className="max-w-4xl mx-auto px-6 mb-24">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl p-10 text-center">
+          <span className="inline-block bg-emerald-500/10 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full mb-6 border border-emerald-500/20">COMING SOON</span>
+          <h2 className="text-3xl font-bold mb-3">Social Ad Creator Agent</h2>
+          <p className="text-slate-400 max-w-2xl mx-auto mb-8">A self-serve tool for non-technical marketers to create AI-generated ad variants at scale. Generate headlines, images, and fully composed ads across Meta, Programmatic Display, and more &mdash; no engineering required.</p>
+          <div className="grid md:grid-cols-3 gap-6 text-left max-w-2xl mx-auto">
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-emerald-400 font-semibold text-sm mb-1">AI Imagery</div>
+              <p className="text-xs text-slate-500">Create or modify visuals with prompts and guardrails for brand guidelines</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-emerald-400 font-semibold text-sm mb-1">Multi-Spec Output</div>
+              <p className="text-xs text-slate-500">Fully composed ads delivered across Social and Display specs</p>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <div className="text-emerald-400 font-semibold text-sm mb-1">Scale Variants</div>
+              <p className="text-xs text-slate-500">Generate 1 to X headline and image variants per campaign brief</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Marketing Control UI - NEW */}
+      <section className="max-w-4xl mx-auto px-6 mb-24">
+        <div className="bg-gradient-to-br from-purple-950/30 to-slate-900/60 border border-purple-500/20 rounded-2xl p-10">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-3">Marketing Control UI</h2>
+            <p className="text-slate-400 max-w-2xl mx-auto">A business tool for <em>operating</em> agents &mdash; not a developer tool for building them. Think Salesforce or HubSpot, not Visual Studio. Non-technical marketers can self-serve.</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4 max-w-xl mx-auto">
+            {[
+              "Non-technical marketers can self-serve without engineering",
+              "Adjust guardrails and messaging rules without writing code",
+              "Monitor agent performance and outputs in real time",
+              "Review, approve, and override AI-generated content",
+              "Connect to Segment, Iterable, and existing martech stack",
+              "Full decision audit log for compliance and QA",
+            ].map(item => (
+              <div key={item} className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
+                <span className="text-sm text-slate-400">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Final CTA */}
       <div className="px-6 lg:px-8 py-16 text-center bg-gradient-to-t from-emerald-950/20 to-transparent border-t border-slate-800">
@@ -206,7 +285,7 @@ export default function LandingPage() {
           Start Free Trial — No Credit Card Required →
         </Link>
         <div className="mt-8 text-xs text-slate-600">
-          © 2025 APEX AI, Inc. · Privacy · Terms · Security
+                    © 2026 APEX AI, Inc. · Privacy · Terms · Security
         </div>
       </div>
     </div>
