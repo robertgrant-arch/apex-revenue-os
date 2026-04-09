@@ -650,7 +650,7 @@ export default function AgentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Agents</h1>
-          <p className="text-slate-400 text-sm mt-0.5">9-node LangGraph-style campaign workflow engine</p>
+          <p className="text-slate-400 text-sm mt-0.5">Marketing Agent Management & Campaign Workflows</p>
         </div>
         <button
           onClick={() => setShowNewModal(true)}
@@ -681,6 +681,33 @@ export default function AgentsPage() {
 
         {/* Left: Workflow List */}
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl flex flex-col">
+
+                {/* Marketing Agents */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-white">Marketing Agents</h2>
+        <p className="text-slate-400 text-sm">Set up, manage, and optimize AI agents for marketing automation</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-3">
+          {[
+            { name: "Brand Consistency", icon: "BC", status: "Active", desc: "Reviews content for brand voice, tone, and style alignment", color: "bg-violet-500/20 text-violet-400" },
+            { name: "Asset Tagging", icon: "AT", status: "Active", desc: "Auto-tags assets by audience, campaign, seasonality, channel", color: "bg-blue-500/20 text-blue-400" },
+            { name: "Email Builder", icon: "EB", status: "Active", desc: "Builds email drafts using design system and compliance rules", color: "bg-emerald-500/20 text-emerald-400" },
+            { name: "Landing Page Assembly", icon: "LP", status: "Active", desc: "Builds campaign landing pages from approved templates", color: "bg-cyan-500/20 text-cyan-400" },
+            { name: "Compliance Review", icon: "CR", status: "Active", desc: "Reviews content against regulatory and internal rules", color: "bg-amber-500/20 text-amber-400" },
+            { name: "Campaign Performance", icon: "CP", status: "Active", desc: "Analyzes results across email, SMS, web to find optimizations", color: "bg-pink-500/20 text-pink-400" },
+            { name: "Marketing Briefing", icon: "MB", status: "Training", desc: "Converts insights into structured campaign briefs", color: "bg-orange-500/20 text-orange-400" },
+            { name: "Experimentation", icon: "EX", status: "Training", desc: "Recommends and designs A/B tests across channels", color: "bg-indigo-500/20 text-indigo-400" },
+          ].map((agent) => (
+            <div key={agent.name} className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 hover:border-indigo-500/40 transition-all cursor-pointer">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-2xl">{agent.icon}</span>
+                <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", agent.status === "Active" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400")}>{agent.status}</span>
+              </div>
+              <h3 className="text-white text-sm font-semibold mb-1">{agent.name}</h3>
+              <p className="text-slate-400 text-xs leading-relaxed">{agent.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
           <div className="px-5 py-4 border-b border-slate-700/50">
             <h3 className="text-white font-medium text-sm">Workflow Runs</h3>
             <p className="text-slate-500 text-xs mt-0.5">{workflows.length} total</p>
