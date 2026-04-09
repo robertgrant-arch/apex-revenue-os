@@ -27,6 +27,38 @@ const VERTICALS: Vertical[]  = ["Medicare", "Auto", "Life", "Home"];
 const AD_TYPES: AdType[]     = ["image", "email", "video"];
 const STATUSES: Status[]     = ["active", "paused", "draft"];
 
+type Platform = "Meta" | "Google" | "Programmatic" | "Display" | "CTV";
+const PLATFORMS: Platform[] = ["Meta", "Google", "Programmatic", "Display", "CTV"];
+
+const AD_SPECS: Record<string, { width: number; height: number; label: string }[]> = {
+    Meta: [
+    { width: 1080, height: 1080, label: "Feed Square 1080x1080" },
+    { width: 1080, height: 1920, label: "Story/Reel 1080x1920" },
+    { width: 1200, height: 628, label: "Link Ad 1200x628" },
+  ],
+  Google: [
+    { width: 300, height: 250, label: "Medium Rectangle 300x250" },
+    { width: 728, height: 90, label: "Leaderboard 728x90" },
+    { width: 160, height: 600, label: "Wide Skyscraper 160x600" },
+  ],
+  Programmatic: [
+    { width: 300, height: 250, label: "Medium Rectangle 300x250" },
+    { width: 970, height: 250, label: "Billboard 970x250" },
+    { width: 320, height: 50, label: "Mobile Banner 320x50" },
+  ],
+  Display: [
+    { width: 728, height: 90, label: "Leaderboard 728x90" },
+    { width: 300, height: 600, label: "Half Page 300x600" },
+    { width: 320, height: 480, label: "Mobile Interstitial 320x480" },
+  ],
+  CTV: [
+    { width: 1920, height: 1080, label: "Full HD 1920x1080" },
+    { width: 1280, height: 720, label: "HD 1280x720" },
+  ],
+};
+
+const AUDIENCES = ["Seniors 65+", "AEP Shoppers", "Dual Eligible", "Under-65 Disabled", "Caregivers", "General"];
+
 const TYPE_COLORS: Record<string, string> = {
   image: "bg-emerald-500/20 text-emerald-400",
   email: "bg-violet-500/20 text-violet-400",
@@ -165,6 +197,11 @@ export default function CreativePage() {
   const [genVertical, setGenVertical] = useState<Vertical>("Medicare");
   const [genType, setGenType]         = useState<AdType>("image");
     const [genPrompt, setGenPrompt] = useState("");
+    const [genPlatform, setGenPlatform] = useState<Platform>("Meta");
+  const [genAudience, setGenAudience] = useState("Seniors 65+");
+  const [genVariants, setGenVariants] = useState(3);
+  const [genSpec, setGenSpec] = useState(AD_SPECS["Meta"][0].label);
+  const [genStep, setGenStep] = useState(1);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -187,7 +224,7 @@ export default function CreativePage() {
       const res = await fetch("/api/generate-creative", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vertical: genVertical, type: genType, prompt: genPrompt }),
+        body: JSON.stringify({ vertical: genVertical, type: genType, prompt: genPrompt, platform: genPlatform, spec: genSpec, audience: genAudience, variants: genVariants }),
       });
       if (!res.ok) throw new Error("API error");
 
@@ -211,7 +248,7 @@ export default function CreativePage() {
     } finally {
       setGenerating(false);
     }
-  }, [genVertical, genType, genPrompt, creatives, persist]);
+  }, [genVertical, genType, genPrompt, genPlatform, genSpec, genAudience, genVariants, creatives, persist]);
 
   // -------------------------------------------------------------------------
   // Delete
@@ -442,6 +479,67 @@ export default function CreativePage() {
                               <div>
                 <label className="text-xs text-slate-400 uppercase tracking-wide mb-2 block">Description (optional)</label>
                 <textarea
+
+                                <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wide mb-2 block">Platform</label>
+                <div className="flex flex-wrap gap-2">
+                  {PLATFORMS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => { setGenPlatform(p); setGenSpec(AD_SPECS[p][0].label); }}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                        genPlatform === p
+                          ? "bg-violet-600 text-white"
+                          : "bg-slate-800 text-slate-400 hover:text-white",
+                      )}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wide mb-2 block">Ad Spec</label>
+                <select
+                  value={genSpec}
+                  onChange={(e) => setGenSpec(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  {AD_SPECS[genPlatform].map((s) => (
+                    <option key={s.label} value={s.label}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wide mb-2 block">Target Audience</label>
+                <select
+                  value={genAudience}
+                  onChange={(e) => setGenAudience(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                >
+                  {AUDIENCES.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wide mb-2 block">Headline Variants</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={genVariants}
+                    onChange={(e) => setGenVariants(Number(e.target.value))}
+                    className="flex-1 accent-violet-500"
+                  />
+                  <span className="text-white font-semibold text-sm w-6 text-center">{genVariants}</span>
+                </div>
+              </div>
                   value={genPrompt}
                   onChange={(e) => setGenPrompt(e.target.value)}
                   placeholder="Describe what you want the creative to accomplish…"
